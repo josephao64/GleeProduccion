@@ -30,7 +30,7 @@
       <h2 id="inventoryTitle"></h2>
       <h1 class="mb-4">Productos</h1>
 
-      <!-- Filtro de tienda para admin -->
+      <!-- Filtro de tienda (visible solo para admin) -->
       <div id="adminStoreFilter" class="mb-3" style="display: none;">
         <label for="storeSelect" class="form-label">Filtrar por tienda:</label>
         <select id="storeSelect" class="form-select">
@@ -51,7 +51,7 @@
         <button id="btnModificarStock" class="btn btn-secondary me-2">
           Modificar Stock
         </button>
-        <!-- Botón exclusivo para admin para cargar productos con cadena de texto -->
+        <!-- Botón exclusivo para admin para cargar productos desde cadena de texto -->
         <button id="btnCargarTexto" class="btn btn-info">
           Cargar con cadena de texto
         </button>
@@ -68,7 +68,7 @@
           </tr>
         </thead>
         <tbody id="productsBody">
-          <!-- Se renderizan los productos aquí -->
+          <!-- Aquí se renderizan los productos -->
         </tbody>
       </table>
     </div>
@@ -97,12 +97,12 @@
       let products = [];
       let selectedProductId = null;
 
-      // Leer datos del usuario (rol, tienda y permisos) desde localStorage
+      // Se leen los datos del usuario desde localStorage
       const loggedUser      = localStorage.getItem("loggedUser") || "";
       const loggedUserRole  = localStorage.getItem("loggedUserRole") || "";
       const loggedUserStore = localStorage.getItem("loggedUserStore") || "DefaultStore";
 
-      // Definir permisos específicos para productos a partir de la estructura de permisos del usuario
+      // Se define el objeto de permisos para productos (por defecto todas en false)
       let userPermissions = {
         crearProducto: false,
         editarProducto: false,
@@ -110,8 +110,8 @@
         modificarStock: false
       };
 
+      // Si el usuario es admin, se habilitan todas las acciones
       if (loggedUserRole.toLowerCase() === "admin") {
-        // Si es admin, se habilitan todas las acciones
         userPermissions = {
           crearProducto: true,
           editarProducto: true,
@@ -119,11 +119,11 @@
           modificarStock: true
         };
       } else {
+        // Para otros usuarios se leen los permisos desde localStorage (se espera que estén en la sección "productos")
         const storedPermissions = localStorage.getItem("loggedUserPermissions");
         if (storedPermissions) {
           try {
             const parsed = JSON.parse(storedPermissions);
-            // Se verifica que exista la sección de "productos"
             if (parsed.productos) {
               userPermissions = {
                 crearProducto: parsed.productos.agregar || false,
@@ -137,11 +137,13 @@
           }
         }
       }
+      // Para depuración
+      console.log("Permisos de productos:", userPermissions);
 
-      // Variable que define la tienda actual para el filtrado de stock
+      // Variable para el filtrado de tienda
       let currentStore = "";
 
-      // Configuración según rol
+      // Configuración según rol: Si es admin se muestra el filtro de tienda
       if (loggedUserRole.toLowerCase() === "admin") {
         document.getElementById("adminStoreFilter").style.display = "block";
         document.getElementById("inventoryTitle").textContent = "Inventario: Stock Total";
@@ -150,7 +152,7 @@
         document.getElementById("inventoryTitle").textContent = `Inventario de: ${currentStore}`;
       }
 
-      // Función para cargar tiendas en el select (solo admin)
+      // Función para cargar tiendas en el select (solo para admin)
       async function loadStoreFilter() {
         try {
           const qStores = query(collection(db, "tiendas"), orderBy("nombre"));
@@ -169,7 +171,7 @@
         }
       }
 
-      // Configuración del select de tiendas para admin
+      // Para admin se configura el select de tiendas
       if (loggedUserRole.toLowerCase() === "admin") {
         document.addEventListener("DOMContentLoaded", () => {
           loadStoreFilter();
@@ -178,8 +180,7 @@
             document.getElementById("inventoryTitle").textContent = currentStore
               ? `Inventario de: ${currentStore}`
               : "Inventario: Stock Total";
-            // Reactivar la escucha para filtrar los productos
-            listenProducts();
+            listenProducts(); // Se vuelve a escuchar para filtrar productos
           });
         });
       }
@@ -231,10 +232,11 @@
             <td>Q ${parseFloat(prod.precio).toFixed(2)}</td>
             <td>${displayedStock}</td>
           `;
+          // Al hacer clic se resalta la fila y se guarda el id del producto seleccionado
           tr.addEventListener("click", () => {
-            document
-              .querySelectorAll("#productsBody tr")
-              .forEach((row) => row.classList.remove("table-active"));
+            document.querySelectorAll("#productsBody tr").forEach((row) =>
+              row.classList.remove("table-active")
+            );
             tr.classList.add("table-active");
             selectedProductId = prod.id;
           });
@@ -242,7 +244,7 @@
         });
       }
 
-      // Calcula el stock a mostrar según rol y tienda actual
+      // Función para calcular el stock a mostrar según rol y tienda actual
       function getDisplayedStock(product) {
         if (!product.stock || typeof product.stock !== "object") {
           return product.stock || 0;
@@ -299,7 +301,7 @@
             descripcion: formValues.descripcion,
             talla: formValues.talla,
             precio: formValues.precio,
-            stock: {},  // Se inicializa el stock como objeto vacío
+            stock: {},  // Se inicia el stock como objeto vacío
             createdAt: new Date().toISOString()
           };
           await addDoc(collection(db, "productos"), newProduct);
@@ -401,6 +403,7 @@
           Swal.fire("Error", "Producto no encontrado", "error");
           return;
         }
+        // Si el usuario es admin y no ha seleccionado tienda, se le solicita seleccionar una
         if (loggedUserRole.toLowerCase() === "admin" && !currentStore) {
           Swal.fire(
             "Tienda no seleccionada",
@@ -440,6 +443,7 @@
         }
       }
 
+      // Función para obtener el stock actual según tienda
       function getCurrentStock(product, store) {
         if (!product.stock || typeof product.stock !== "object") {
           return product.stock || 0;
@@ -456,7 +460,7 @@
       document.addEventListener("DOMContentLoaded", () => {
         listenProducts();
 
-        // Asignar eventos a los botones según los permisos configurados
+        // Asignación de eventos a los botones según permisos
         const btnCrearProducto = document.getElementById("btnCrearProducto");
         const btnEditarProducto = document.getElementById("btnEditarProducto");
         const btnEliminarProducto = document.getElementById("btnEliminarProducto");
@@ -487,7 +491,7 @@
           btnModificarStock.addEventListener("click", modificarStock);
         }
 
-        // El botón "Cargar con cadena de texto" solo se muestra para admin
+        // El botón "Cargar con cadena de texto" se muestra solo para admin
         if (loggedUserRole.toLowerCase() === "admin") {
           btnCargarTexto.style.display = "inline-block";
           btnCargarTexto.addEventListener("click", cargarConCadenaTexto);
@@ -495,6 +499,8 @@
           btnCargarTexto.style.display = "none";
         }
       });
+
+      // Nota: la función "cargarConCadenaTexto" no se muestra aquí; inclúyela según tus necesidades para carga masiva.
     </script>
   </body>
 </html>

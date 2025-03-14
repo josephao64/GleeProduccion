@@ -445,8 +445,74 @@ async function procesarVenta() {
  * Descargar Comprobante PDF
  *******************************************************/
 function descargarComprobante(venta) {
-  console.log("Comprobante PDF =>", venta);
-  Swal.fire("PDF", "Pendiente implementar PDF con jsPDF", "info");
+  // Extraer jsPDF desde el objeto global (ya que se cargó desde el CDN)
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+
+  let y = 10;
+  const lineHeight = 10;
+  
+  // Encabezado
+  doc.setFontSize(16);
+  doc.text("Comprobante de Venta", 10, y);
+  
+  y += lineHeight * 1.5;
+  doc.setFontSize(12);
+  doc.text(`Venta ID: ${venta.idVenta}`, 10, y);
+  y += lineHeight;
+  doc.text(`Fecha: ${new Date(venta.fecha).toLocaleString()}`, 10, y);
+  y += lineHeight;
+  doc.text(`Cajero: ${venta.usuario}`, 10, y);
+  
+  // Datos del Cliente
+  y += lineHeight * 1.5;
+  doc.setFontSize(14);
+  doc.text("Datos del Cliente", 10, y);
+  
+  y += lineHeight;
+  doc.setFontSize(12);
+  doc.text(`Nombre: ${venta.cliente.nombre}`, 10, y);
+  y += lineHeight;
+  doc.text(`Teléfono: ${venta.cliente.telefono}`, 10, y);
+  if (venta.cliente.correo) {
+    y += lineHeight;
+    doc.text(`Correo: ${venta.cliente.correo}`, 10, y);
+  }
+  if (venta.cliente.direccion) {
+    y += lineHeight;
+    doc.text(`Dirección: ${venta.cliente.direccion}`, 10, y);
+  }
+  
+  // Detalle de la Venta
+  y += lineHeight * 1.5;
+  doc.setFontSize(14);
+  doc.text("Detalle de la Venta", 10, y);
+  
+  y += lineHeight;
+  doc.setFontSize(12);
+  venta.productos.forEach((prod, index) => {
+    // Si el contenido excede el límite de la página, se añade una nueva
+    if (y > 270) {
+      doc.addPage();
+      y = 10;
+    }
+    doc.text(`${index + 1}. ${prod.producto_nombre} (${prod.producto_codigo})`, 10, y);
+    y += lineHeight;
+    doc.text(`   Cant: ${prod.cantidad} x Q${parseFloat(prod.precio_unitario).toFixed(2)} = Q${parseFloat(prod.subtotal).toFixed(2)}`, 10, y);
+    y += lineHeight;
+  });
+
+  y += lineHeight;
+  doc.text(`Total: Q${parseFloat(venta.total).toFixed(2)}`, 10, y);
+  y += lineHeight;
+  doc.text(`Método de Pago: ${venta.metodo_pago}`, 10, y);
+  if (venta.metodo_pago.toLowerCase() === "efectivo") {
+    y += lineHeight;
+    doc.text(`Cambio: Q${parseFloat(venta.cambio).toFixed(2)}`, 10, y);
+  }
+  
+  // Visualizar PDF en una nueva pestaña
+  doc.output("dataurlnewwindow");
 }
 
 /*******************************************************

@@ -116,17 +116,18 @@
         where,
         doc,
         updateDoc,
-        deleteDoc
+        deleteDoc,
+        getDoc
       } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
       // Configuración de Firebase (ajusta según tu proyecto)
       const firebaseConfig = {
-        apiKey: "AIzaSyAjVTKBJwZ8qql32ZrZBy0Q1NFUYMu-Xzk",
-        authDomain: "gleedb-5d36a.firebaseapp.com",
-        projectId: "gleedb-5d36a",
-        storageBucket: "gleedb-5d36a",
-        messagingSenderId: "1090238022032",
-        appId: "1:1090238022032:web:c637b0a6dfe06be5287315"
+        apiKey: "AIzaSyBoBj8-oqIwAOJG7aplYPWt7q4J3wigbmc",
+  authDomain: "gleedb-d9478.firebaseapp.com",
+  projectId: "gleedb-d9478",
+  storageBucket: "gleedb-d9478.firebasestorage.app",
+  messagingSenderId: "722495997438",
+  appId: "1:722495997438:web:19fd9152263a4651feacaf"
       };
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
@@ -136,7 +137,7 @@
       // Se espera que el rol del usuario se guarde en localStorage con la clave "loggedUserRole"
       let loggedUser = localStorage.getItem("loggedUser") || "";
       let loggedUserRole = localStorage.getItem("loggedUserRole") || "";
-      
+
       // Inicializar DataTable
       $(document).ready(function () {
         tablaVentas = $("#ventasTable").DataTable({
@@ -218,10 +219,33 @@
         return true;
       });
 
-      // Función para ver comprobante de venta
-      window.verVenta = function (idVenta) {
-        // Implementa la visualización del comprobante (por ejemplo, en un modal)
-        Swal.fire("Ver Venta", "Implementa la visualización del comprobante.", "info");
+      // Función para ver comprobante de venta y descargar el ticket en PDF
+      window.verVenta = async function (idVenta) {
+        try {
+          const ventaDoc = doc(db, "ventas", idVenta);
+          const docSnap = await getDoc(ventaDoc);
+          if (docSnap.exists()) {
+            let venta = docSnap.data();
+            venta.id = idVenta;
+            Swal.fire({
+              title: "Comprobante de Venta",
+              html: `
+                <div>
+                  <p><strong>ID:</strong> ${venta.id}</p>
+                  <p><strong>Fecha:</strong> ${new Date(venta.fecha).toLocaleString()}</p>
+                  <p><strong>Cliente:</strong> ${venta.cliente.nombre}</p>
+                  <p><strong>Total:</strong> Q${venta.total.toFixed(2)}</p>
+                  <p><strong>Método de Pago:</strong> ${venta.metodo_pago}</p>
+                  <p><strong>Estado:</strong> ${venta.estado ? venta.estado : "COMPLETADA"}</p>
+                  <button class="btn btn-sm btn-primary" onclick="descargarComprobante('${encodeURIComponent(JSON.stringify(venta))}')">Descargar PDF</button>
+                </div>
+              `,
+              showConfirmButton: true
+            });
+          }
+        } catch (error) {
+          Swal.fire("Error", error.toString(), "error");
+        }
       };
 
       // Función para anular venta (solo admin)
@@ -278,19 +302,45 @@
         });
       };
 
-      // Función para descargar comprobante en PDF (ticket)
-      window.descargarComprobante = function (venta) {
+      // Función para descargar y visualizar el comprobante (ticket) en PDF y descargarlo
+      window.descargarComprobante = function(ventaEncoded) {
+        // Decodificar el objeto venta
+        const venta = JSON.parse(decodeURIComponent(ventaEncoded));
         const { jsPDF } = window.jspdf;
+        // Crear un PDF con formato de ticket (80 x 300 mm)
         const doc = new jsPDF({
           orientation: 'p',
           unit: 'mm',
           format: [80, 300]
         });
-        // Aquí se implementa la lógica de generación del ticket
-        doc.setFont("helvetica", "bold");
+        let y = 5;
+        const lineHeight = 5;
+        // Encabezado
+        doc.setFont("Helvetica", "bold");
         doc.setFontSize(12);
-        doc.text("Ticket de Venta", 40, 10, { align: "center" });
-        doc.save("comprobante.pdf");
+        doc.text("TICKET DE VENTA", 40, y, { align: "center" });
+        y += lineHeight * 2;
+        // Datos básicos
+        doc.setFont("Helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text(`ID: ${venta.id}`, 5, y);
+        y += lineHeight;
+        doc.text(`Fecha: ${new Date(venta.fecha).toLocaleString()}`, 5, y);
+        y += lineHeight;
+        doc.text(`Cliente: ${venta.cliente.nombre}`, 5, y);
+        y += lineHeight;
+        doc.text(`Total: Q${venta.total.toFixed(2)}`, 5, y);
+        y += lineHeight;
+        doc.text(`Pago: ${venta.metodo_pago}`, 5, y);
+        y += lineHeight * 2;
+        // Mensaje final
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(10);
+        doc.text("¡Gracias por su compra!", 40, y, { align: "center" });
+        // Visualizar el PDF en una nueva pestaña
+        doc.output("dataurlnewwindow");
+        // Descargar automáticamente el ticket en PDF
+        doc.save("ticket.pdf");
       };
     </script>
   </body>
