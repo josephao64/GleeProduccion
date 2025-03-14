@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Administración de Tiendas</title>
+    
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
+    <style>
+      body {
+        padding: 20px;
+      }
+    </style>
+  </head>
+  
+  <body>
+    <div class="container">
+      <h1 class="mb-4">Administración de Tiendas</h1>
+      <button class="btn btn-primary mb-3" onclick="showStoreForm()">Crear Tienda</button>
+      
+      <table class="table table-bordered" id="storesTable">
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Dirección</th>
+            <th>Habilitada</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Se cargarán las tiendas dinámicamente -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Modal para Crear/Editar Tienda -->
+    <div
+      class="modal fade"
+      id="storeModal"
+      tabindex="-1"
+      aria-labelledby="storeModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form id="storeForm">
+            <div class="modal-header">
+              <h5 class="modal-title" id="storeModalLabel">Crear Tienda</h5>
+              <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="modal"
+                aria-label="Cerrar"
+              ></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" id="storeId" />
+              
+              <div class="mb-3">
+                <label for="storeName" class="form-label">Nombre</label>
+                <input type="text" id="storeName" class="form-control" required />
+              </div>
+              
+              <div class="mb-3">
+                <label for="storeAddress" class="form-label">Dirección</label>
+                <input type="text" id="storeAddress" class="form-control" />
+              </div>
+              
+              <div class="mb-3">
+                <label class="form-label">Habilitada</label>
+                <select id="storeEnabled" class="form-select">
+                  <option value="true">Sí</option>
+                  <option value="false">No</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button
+                type="button"
+                class="btn btn-secondary"
+                data-bs-dismiss="modal"
+              >
+                Cancelar
+              </button>
+              <button type="submit" class="btn btn-primary">Guardar Tienda</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle (incluye Popper) -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"
+    ></script>
+    
+    <!-- Script principal con type="module" -->
+    <script type="module">
+      /************************************************
+       * 1. Importar la referencia 'db' de firebase-config
+       ************************************************/
+      import { db } from "./firebase-config.js";
+      import {
+        collection,
+        query,
+        orderBy,
+        getDocs,
+        doc,
+        getDoc,
+        addDoc,
+        updateDoc,
+        deleteDoc
+      } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+      let stores = [];
+
+      /************************************************
+       * 2. Función para cargar y mostrar las tiendas
+       ************************************************/
+      async function loadStores() {
+        try {
+          // Consulta la colección "tiendas", ordenada por "nombre"
+          const q = query(collection(db, "tiendas"), orderBy("nombre"));
+          const snapshot = await getDocs(q);
+
+          stores = [];
+          const tbody = document.querySelector("#storesTable tbody");
+          tbody.innerHTML = "";
+
+          snapshot.forEach((docSnap) => {
+            const store = docSnap.data();
+            store.id = docSnap.id;
+            stores.push(store);
+
+            const row = tbody.insertRow();
+            row.insertCell(0).textContent = store.nombre;
+            row.insertCell(1).textContent = store.direccion || "";
+            row.insertCell(2).textContent = store.enabled ? "Sí" : "No";
+
+            const cellActions = row.insertCell(3);
+            cellActions.innerHTML = `
+              <button
+                class="btn btn-sm btn-primary me-1"
+                onclick="editStore('${store.id}')"
+              >
+                Editar
+              </button>
+              <button
+                class="btn btn-sm btn-warning me-1"
+                onclick="toggleStore('${store.id}', ${store.enabled})"
+              >
+                ${store.enabled ? "Deshabilitar" : "Habilitar"}
+              </button>
+              <button
+                class="btn btn-sm btn-danger"
+                onclick="deleteStore('${store.id}')"
+              >
+                Eliminar
+              </button>
+            `;
+          });
+        } catch (error) {
+          console.error("Error al cargar tiendas:", error);
+          Swal.fire("Error", "Error al cargar tiendas: " + error.message, "error");
+        }
+      }
+
+      /************************************************
+       * 3. Mostrar formulario para crear nueva tienda
+       ************************************************/
+      function showStoreForm() {
+        document.getElementById("storeForm").reset();
+        document.getElementById("storeId").value = "";
+        document.getElementById("storeModalLabel").textContent = "Crear Tienda";
+
+        new bootstrap.Modal(document.getElementById("storeModal")).show();
+      }
+
+      /************************************************
+       * 4. Cargar tienda en formulario para edición
+       ************************************************/
+      async function editStore(storeId) {
+        try {
+          const docRef = doc(db, "tiendas", storeId);
+          const docSnap = await getDoc(docRef);
+
+          if (!docSnap.exists()) {
+            Swal.fire("Error", "Tienda no encontrada.", "error");
+            return;
+          }
+          const store = docSnap.data();
+          
+          document.getElementById("storeId").value = storeId;
+          document.getElementById("storeName").value = store.nombre;
+          document.getElementById("storeAddress").value = store.direccion || "";
+          document.getElementById("storeEnabled").value = store.enabled ? "true" : "false";
+
+          document.getElementById("storeModalLabel").textContent = "Editar Tienda";
+          new bootstrap.Modal(document.getElementById("storeModal")).show();
+        } catch (error) {
+          console.error("Error al cargar tienda:", error);
+          Swal.fire("Error", "Error al cargar tienda: " + error.message, "error");
+        }
+      }
+
+      /************************************************
+       * 5. Eliminar tienda
+       ************************************************/
+      async function deleteStore(storeId) {
+        if (!confirm("¿Está seguro de eliminar esta tienda?")) return;
+        try {
+          await deleteDoc(doc(db, "tiendas", storeId));
+          Swal.fire("Éxito", "Tienda eliminada.", "success");
+          loadStores();
+        } catch (error) {
+          console.error("Error al eliminar tienda:", error);
+          Swal.fire("Error", "Error al eliminar tienda: " + error.message, "error");
+        }
+      }
+
+      /************************************************
+       * 6. Alternar tienda (habilitar/deshabilitar)
+       ************************************************/
+      async function toggleStore(storeId, currentStatus) {
+        try {
+          await updateDoc(doc(db, "tiendas", storeId), {
+            enabled: !currentStatus
+          });
+          Swal.fire("Éxito", "Estado de la tienda actualizado.", "success");
+          loadStores();
+        } catch (error) {
+          console.error("Error al actualizar estado:", error);
+          Swal.fire("Error", "Error al actualizar estado: " + error.message, "error");
+        }
+      }
+
+      /************************************************
+       * 7. Manejo del formulario (crear/editar)
+       ************************************************/
+      document.getElementById("storeForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        
+        const storeId = document.getElementById("storeId").value;
+        const nombre = document.getElementById("storeName").value.trim();
+        const direccion = document.getElementById("storeAddress").value.trim();
+        const enabled = document.getElementById("storeEnabled").value === "true";
+
+        if (!nombre) {
+          Swal.fire("Error", "El nombre es obligatorio.", "error");
+          return;
+        }
+
+        try {
+          const storeData = { nombre, direccion, enabled };
+          if (storeId) {
+            // Actualizar tienda existente
+            const storeRef = doc(db, "tiendas", storeId);
+            await updateDoc(storeRef, storeData);
+            Swal.fire("Éxito", "Tienda actualizada.", "success");
+          } else {
+            // Crear nueva tienda
+            await addDoc(collection(db, "tiendas"), storeData);
+            Swal.fire("Éxito", "Tienda creada.", "success");
+          }
+
+          // Cerrar modal y recargar tabla
+          bootstrap.Modal.getInstance(document.getElementById("storeModal")).hide();
+          loadStores();
+        } catch (error) {
+          console.error("Error al guardar tienda:", error);
+          Swal.fire("Error", "Error al guardar tienda: " + error.message, "error");
+        }
+      });
+
+      /************************************************
+       * 8. Exponer funciones a window para uso en HTML
+       ************************************************/
+      window.showStoreForm = showStoreForm;
+      window.editStore = editStore;
+      window.deleteStore = deleteStore;
+      window.toggleStore = toggleStore;
+
+      /************************************************
+       * 9. Cargar tiendas al iniciar
+       ************************************************/
+      document.addEventListener("DOMContentLoaded", () => {
+        loadStores();
+      });
+    </script>
+  </body>
+</html>

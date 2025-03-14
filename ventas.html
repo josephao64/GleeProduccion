@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Sistema de Ventas con Apertura y Cierre de Caja (Firebase v9)</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- jQuery (opcional) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- jsPDF para generación de PDF (si se implementa posteriormente) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+      body {
+        padding: 20px;
+      }
+      .summary-box {
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 5px;
+        margin-bottom: 10px;
+      }
+      .bg-light {
+        background-color: #f8f9fa !important;
+      }
+      .table-active {
+        background-color: #d1ecf1 !important;
+      }
+      .filter-group {
+        margin-bottom: 15px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <div class="row">
+        <!-- Lado Izquierdo: Carrito y Control de Caja -->
+        <div class="col-md-5 border-end">
+          <h2>Carrito de Venta</h2>
+          <table class="table table-sm" id="cartTable">
+            <thead>
+              <tr>
+                <th>Producto</th>
+                <th>Cant.</th>
+                <th>Precio Unitario (Q)</th>
+                <th>Subtotal (Q)</th>
+                <th>Remover</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+          <h4>Total: Q <span id="totalVenta">0.00</span></h4>
+          <button class="btn btn-success mt-2" onclick="procesarVenta()">Procesar Venta</button>
+          <hr />
+          <!-- Apertura y Cierre de Caja -->
+          <button class="btn btn-warning mt-2" onclick="abrirCaja()">Abrir Caja</button>
+          <button class="btn btn-danger mt-2" onclick="cerrarCaja()">Cerrar Caja</button>
+        </div>
+
+        <!-- Lado Derecho: Productos Disponibles -->
+        <div class="col-md-7">
+          <h2>Productos Disponibles</h2>
+          <!-- Filtro de tienda (visible solo para admin) -->
+          <div id="adminStoreFilter" class="mb-3" style="display: none;">
+            <label for="storeSelect" class="form-label">Filtrar por tienda:</label>
+            <select id="storeSelect" class="form-select">
+              <option value="">Inventario: Stock Total</option>
+            </select>
+          </div>
+          <!-- Título del inventario -->
+          <h4 id="inventoryTitle">Inventario: Stock Total</h4>
+          <!-- Buscador de productos -->
+          <div class="filter-group">
+            <input
+              type="text"
+              id="searchInput"
+              class="form-control"
+              placeholder="Buscar por código o descripción"
+            />
+          </div>
+          <!-- Filtro por Talla -->
+          <div class="filter-group">
+            <select id="sizeFilter" class="form-select">
+              <option value="">Todas las tallas</option>
+              <option value="S">S</option>
+              <option value="M">M</option>
+              <option value="L">L</option>
+              <option value="XL">XL</option>
+            </select>
+          </div>
+          <table class="table table-bordered" id="productsTable">
+            <thead class="table-light">
+              <tr>
+                <th>Código</th>
+                <th>Descripción</th>
+                <th>Talla</th>
+                <th>Precio</th>
+                <th>Stock</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody id="productsBody">
+              <!-- Los productos se renderizarán dinámicamente -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Script principal: ventas.js (lógica de ventas, caja y venta) -->
+    <script type="module" src="ventas.js"></script>
+  </body>
+</html>

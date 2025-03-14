@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gestión de Traslados</title>
+  
+  <!-- Bootstrap CSS -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    rel="stylesheet"
+  />
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+  <style>
+    body {
+      padding: 20px;
+    }
+    .table-warning {
+      background-color: #ffeeba !important;
+    }
+    .detail-card {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-top: 15px;
+      border-radius: 5px;
+      background-color: #f8f9fa;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1 class="mb-4">Gestión de Traslados</h1>
+
+    <!-- Botón para crear nuevo traslado -->
+    <button id="btnNuevoTraslado" class="btn btn-primary mb-3" onclick="showTransferForm()">
+      Nuevo Traslado
+    </button>
+
+    <!-- Filtro de tiendas (solo para admin) en "Mis Traslados" -->
+    <div id="adminStoreFilterOrigin" class="mb-3" style="display: none;">
+      <label for="storeSelectOrigin" class="form-label">Filtrar "Mis Traslados" por Origen:</label>
+      <select id="storeSelectOrigin" class="form-select">
+        <option value="">Ver todos los traslados</option>
+      </select>
+    </div>
+
+    <!-- Sección: Mis Traslados -->
+    <h2>Mis Traslados</h2>
+    <table class="table table-striped" id="myTransfersTable">
+      <thead>
+        <tr>
+          <th>ID Traslado</th>
+          <th>Producto</th>
+          <th>Cantidad</th>
+          <th>Tienda Origen</th>
+          <th>Tienda Destino</th>
+          <th>Fecha</th>
+          <th>Estado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Aquí se cargarán los traslados (del usuario o todos si admin) -->
+      </tbody>
+    </table>
+    
+    <!-- Filtro de tiendas (solo para admin) en "Validar Traslados" -->
+    <div id="adminStoreFilterDestination" class="mb-3" style="display: none;">
+      <label for="storeSelectDestination" class="form-label">Filtrar "Traslados Pendientes" por Destino:</label>
+      <select id="storeSelectDestination" class="form-select">
+        <option value="">Ver todos los pendientes</option>
+      </select>
+    </div>
+
+    <!-- Sección: Validar Traslados Recepción -->
+    <h2>Validar Traslados Recepción</h2>
+    <div class="mb-3">
+      <label for="destinationFilter" class="form-label">Tienda Destino (no editable)</label>
+      <input type="text" id="destinationFilter" class="form-control" readonly />
+    </div>
+    <table class="table table-striped" id="pendingTransfersTable">
+      <thead>
+        <tr>
+          <th>ID Traslado</th>
+          <th>Fecha</th>
+          <th>Producto</th>
+          <th>Cantidad</th>
+          <th>Pedido Por</th>
+          <th>Stock Actual</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- Aquí se cargarán los traslados pendientes para validar -->
+      </tbody>
+    </table>
+    
+    <!-- Tarjeta de Detalle para Validación -->
+    <div id="transferDetail" class="detail-card" style="display:none;">
+      <h4>Detalle del Pedido</h4>
+      <p><strong>ID Traslado:</strong> <span id="detailId"></span></p>
+      <p><strong>Producto:</strong> <span id="detailProduct"></span></p>
+      <p><strong>Cantidad:</strong> <span id="detailQuantity"></span></p>
+      <p><strong>Pedido Por:</strong> <span id="detailPedidoPor"></span></p>
+      <p><strong>Stock Actual en Destino:</strong> <span id="detailStock"></span></p>
+      <button class="btn btn-success" onclick="validateTransfer()">Pedido Recibido</button>
+    </div>
+  </div>
+  
+  <!-- Modal para Crear/Editar Traslado -->
+  <div class="modal fade" id="transferModal" tabindex="-1" aria-labelledby="transferModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <form id="transferForm">
+          <div class="modal-header">
+            <h5 class="modal-title" id="transferModalLabel">Nuevo Traslado</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Campo oculto para el ID (en caso de edición) -->
+            <input type="hidden" id="transferId" />
+            
+            <!-- Selección de producto -->
+            <div class="mb-3">
+              <label for="transferProduct" class="form-label">Producto</label>
+              <select id="transferProduct" class="form-select" required></select>
+            </div>
+            
+            <!-- Mostrar stock actual en la tienda origen -->
+            <div id="productStockInfo" class="mb-3 text-muted"></div>
+            
+            <div class="mb-3">
+              <label for="transferQuantity" class="form-label">Cantidad</label>
+              <input type="number" id="transferQuantity" class="form-control" min="1" required />
+            </div>
+            
+            <!-- Contenedor para Tienda Origen (admin => <select>, no admin => <input readonly>) -->
+            <div class="mb-3" id="originStoreContainer">
+            </div>
+            
+            <div class="mb-3">
+              <label for="transferDestination" class="form-label">Tienda Destino</label>
+              <select id="transferDestination" class="form-select" required>
+                <!-- Se llenará dinámicamente (excluyendo tienda de origen) -->
+              </select>
+            </div>
+            
+            <div class="mb-3">
+              <label for="transferComments" class="form-label">Comentarios</label>
+              <textarea id="transferComments" class="form-control"></textarea>
+            </div>
+          </div>
+          
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+            <button type="submit" class="btn btn-primary">Guardar Traslado</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Bootstrap JS Bundle -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <!-- Archivo principal de lógica (Firebase V9) -->
+  <!-- Ajusta la ruta si está en otra carpeta -->
+  <script type="module" src="traslados.js"></script>
+</body>
+</html>

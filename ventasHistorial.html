@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Historial de Ventas</title>
+    <!-- Bootstrap CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+    />
+    <!-- DataTables CSS -->
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css"
+    />
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- jQuery (requerido por DataTables) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+    <!-- jsPDF para generar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+      body {
+        padding: 20px;
+      }
+      /* Todos los textos en la tabla se muestran en mayúsculas */
+      table.dataTable th,
+      table.dataTable td {
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .date-filter,
+      .order-filter,
+      .select-filter {
+        max-width: 200px;
+        margin-right: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="mb-4">Historial de Ventas</h1>
+      <!-- Filtros avanzados -->
+      <div class="row mb-3">
+        <div class="col-md-2">
+          <label for="fechaInicio" class="form-label">Fecha Inicio</label>
+          <input type="date" id="fechaInicio" class="form-control date-filter" />
+        </div>
+        <div class="col-md-2">
+          <label for="fechaFin" class="form-label">Fecha Fin</label>
+          <input type="date" id="fechaFin" class="form-control date-filter" />
+        </div>
+        <div class="col-md-2">
+          <label for="orderVenta" class="form-label">Ordenar por</label>
+          <select id="orderVenta" class="form-select order-filter">
+            <option value="desc" selected>Ventas más recientes</option>
+            <option value="asc">Ventas más antiguas</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label for="metodoPagoFilter" class="form-label">Método de Pago</label>
+          <select id="metodoPagoFilter" class="form-select select-filter">
+            <option value="">TODOS</option>
+            <option value="EFECTIVO">EFECTIVO</option>
+            <option value="TARJETA">TARJETA</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label for="estadoFilter" class="form-label">Estado</label>
+          <select id="estadoFilter" class="form-select select-filter">
+            <option value="">TODOS</option>
+            <option value="COMPLETADA">COMPLETADA</option>
+            <option value="ANULADA">ANULADA</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label for="buscadorGeneral" class="form-label">Buscar</label>
+          <input type="text" id="buscadorGeneral" class="form-control" placeholder="Buscar..." />
+        </div>
+      </div>
+      <table id="ventasTable" class="table table-striped table-bordered">
+        <thead>
+          <tr>
+            <th>ID VENTA</th>
+            <th>FECHA</th>
+            <th>CLIENTE</th>
+            <th>MONTO TOTAL</th>
+            <th>MÉTODO DE PAGO</th>
+            <th>ESTADO</th>
+            <th>ACCIONES</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Se cargarán dinámicamente desde Firestore -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+      // Importar Firebase v9 modular
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        query,
+        orderBy,
+        getDocs,
+        onSnapshot,
+        where,
+        doc,
+        updateDoc,
+        deleteDoc
+      } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+      // Configuración de Firebase (ajusta según tu proyecto)
+      const firebaseConfig = {
+        apiKey: "AIzaSyAjVTKBJwZ8qql32ZrZBy0Q1NFUYMu-Xzk",
+        authDomain: "gleedb-5d36a.firebaseapp.com",
+        projectId: "gleedb-5d36a",
+        storageBucket: "gleedb-5d36a",
+        messagingSenderId: "1090238022032",
+        appId: "1:1090238022032:web:c637b0a6dfe06be5287315"
+      };
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      // Variables globales
+      let tablaVentas;
+      // Se espera que el rol del usuario se guarde en localStorage con la clave "loggedUserRole"
+      let loggedUser = localStorage.getItem("loggedUser") || "";
+      let loggedUserRole = localStorage.getItem("loggedUserRole") || "";
+      
+      // Inicializar DataTable
+      $(document).ready(function () {
+        tablaVentas = $("#ventasTable").DataTable({
+          language: {
+            url: "https://cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
+          },
+          columns: [
+            { title: "ID VENTA" },
+            { title: "FECHA" },
+            { title: "CLIENTE" },
+            { title: "MONTO TOTAL" },
+            { title: "MÉTODO DE PAGO" },
+            { title: "ESTADO" },
+            { title: "ACCIONES", orderable: false }
+          ],
+          order: [[1, "desc"]],
+          responsive: true
+        });
+        cargarVentas();
+
+        // Eventos para filtros externos
+        $("#fechaInicio, #fechaFin, #metodoPagoFilter, #estadoFilter").on("change", function () {
+          tablaVentas.draw();
+        });
+        $("#buscadorGeneral").on("keyup", function () {
+          tablaVentas.search(this.value).draw();
+        });
+        $("#orderVenta").on("change", function () {
+          let order = $(this).val();
+          tablaVentas.order([1, order]).draw();
+        });
+      });
+
+      // Función para cargar ventas desde Firestore
+      function cargarVentas() {
+        const ventasQuery = query(collection(db, "ventas"), orderBy("fecha", "desc"));
+        onSnapshot(ventasQuery, (snapshot) => {
+          tablaVentas.clear();
+          snapshot.forEach((docSnap) => {
+            let venta = docSnap.data();
+            venta.id = docSnap.id;
+            // Si el usuario es admin, se muestran los botones de anular y eliminar
+            let acciones = `<button class="btn btn-sm btn-info" onclick="verVenta('${venta.id}')">📜 VER</button>`;
+            if (loggedUserRole.toLowerCase() === "admin") {
+              acciones += `<button class="btn btn-sm btn-warning" onclick="anularVenta('${venta.id}')">✖ ANULAR</button>`;
+              acciones += `<button class="btn btn-sm btn-danger" onclick="eliminarVenta('${venta.id}')">❌ ELIMINAR</button>`;
+            }
+            tablaVentas.row.add([
+              venta.id,
+              new Date(venta.fecha).toLocaleString(),
+              venta.cliente.nombre,
+              "Q" + venta.total.toFixed(2),
+              venta.metodo_pago,
+              venta.estado ? venta.estado : "COMPLETADA",
+              acciones
+            ]);
+          });
+          tablaVentas.draw();
+        });
+      }
+
+      // Filtro personalizado para rango de fechas, método y estado
+      $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
+        let fechaInicio = $("#fechaInicio").val();
+        let fechaFin = $("#fechaFin").val();
+        let fechaVenta = new Date(data[1]);
+        if (fechaInicio) {
+          if (fechaVenta < new Date(fechaInicio)) return false;
+        }
+        if (fechaFin) {
+          let fin = new Date(fechaFin);
+          fin.setHours(23, 59, 59, 999);
+          if (fechaVenta > fin) return false;
+        }
+        let filtroMetodo = $("#metodoPagoFilter").val();
+        if (filtroMetodo && data[4].toUpperCase() !== filtroMetodo.toUpperCase()) return false;
+        let filtroEstado = $("#estadoFilter").val();
+        if (filtroEstado && data[5].toUpperCase() !== filtroEstado.toUpperCase()) return false;
+        return true;
+      });
+
+      // Función para ver comprobante de venta
+      window.verVenta = function (idVenta) {
+        // Implementa la visualización del comprobante (por ejemplo, en un modal)
+        Swal.fire("Ver Venta", "Implementa la visualización del comprobante.", "info");
+      };
+
+      // Función para anular venta (solo admin)
+      window.anularVenta = function (idVenta) {
+        if (loggedUserRole.toLowerCase() !== "admin") {
+          Swal.fire("Acceso Denegado", "No tienes permiso para anular ventas.", "error");
+          return;
+        }
+        const ventaDoc = doc(db, "ventas", idVenta);
+        getDoc(ventaDoc).then((docSnap) => {
+          if (docSnap.exists()) {
+            let venta = docSnap.data();
+            if (venta.estado && venta.estado.toUpperCase() === "ANULADA") {
+              Swal.fire("LA VENTA YA ESTÁ ANULADA", "", "info");
+              return;
+            }
+            Swal.fire({
+              title: "¿ANULAR VENTA?",
+              text: "Esta acción marcará la venta como anulada.",
+              icon: "warning",
+              showCancelButton: true,
+              confirmButtonText: "SÍ, ANULAR"
+            }).then((result) => {
+              if (result.isConfirmed) {
+                updateDoc(ventaDoc, { estado: "ANULADA" }).then(() => {
+                  Swal.fire("VENTA ANULADA", "", "success");
+                });
+              }
+            });
+          }
+        });
+      };
+
+      // Función para eliminar venta (solo admin)
+      window.eliminarVenta = function (idVenta) {
+        if (loggedUserRole.toLowerCase() !== "admin") {
+          Swal.fire("Acceso Denegado", "No tienes permiso para eliminar ventas.", "error");
+          return;
+        }
+        Swal.fire({
+          title: "¿ELIMINAR VENTA?",
+          text: "Esta acción eliminará la venta permanentemente.",
+          icon: "error",
+          showCancelButton: true,
+          confirmButtonText: "SÍ, ELIMINAR"
+        }).then((result) => {
+          if (result.isConfirmed) {
+            deleteDoc(doc(db, "ventas", idVenta)).then(() => {
+              Swal.fire("VENTA ELIMINADA", "", "success");
+            }).catch((error) => {
+              Swal.fire("ERROR", error.toString(), "error");
+            });
+          }
+        });
+      };
+
+      // Función para descargar comprobante en PDF (ticket)
+      window.descargarComprobante = function (venta) {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF({
+          orientation: 'p',
+          unit: 'mm',
+          format: [80, 300]
+        });
+        // Aquí se implementa la lógica de generación del ticket
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text("Ticket de Venta", 40, 10, { align: "center" });
+        doc.save("comprobante.pdf");
+      };
+    </script>
+  </body>
+</html>

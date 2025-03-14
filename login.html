@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Login</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+      body {
+        padding: 20px;
+      }
+    </style>
+
+    <!-- Firebase: Versión modular (Firebase 9+) -->
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        query,
+        orderBy,
+        where,
+        getDocs
+      } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+      // Configuración de Firebase
+      const firebaseConfig = {
+        apiKey: "AIzaSyBoBj8-oqIwAOJG7aplYPWt7q4J3wigbmc",
+        authDomain: "gleedb-d9478.firebaseapp.com",
+        projectId: "gleedb-d9478",
+        storageBucket: "gleedb-d9478.firebasestorage.app",
+        messagingSenderId: "722495997438",
+        appId: "1:722495997438:web:19fd9152263a4651feacaf"
+      };
+
+      // Inicializar Firebase y Firestore
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      // Función para cargar usuarios desde Firestore y llenar el <select>
+      async function loadUsers() {
+        try {
+          const usuariosRef = collection(db, "usuarios");
+          const q = query(usuariosRef, orderBy("username"));
+          const snapshot = await getDocs(q);
+
+          const userSelect = document.getElementById("userSelect");
+          userSelect.innerHTML = "";
+          snapshot.forEach((docSnap) => {
+            const user = docSnap.data();
+            // Se asume que el campo 'username' existe en cada documento
+            const option = document.createElement("option");
+            option.value = user.username;
+            option.textContent = user.username;
+            userSelect.appendChild(option);
+          });
+        } catch (error) {
+          console.error("Error al cargar usuarios:", error);
+          Swal.fire("Error", "Error al cargar usuarios: " + error.message, "error");
+        }
+      }
+
+      // Función para manejar el login
+      async function handleLogin() {
+        const selectedUser = document.getElementById("userSelect").value;
+        const passwordInput = document.getElementById("passwordInput").value;
+
+        try {
+          const usuariosRef = collection(db, "usuarios");
+          const q = query(usuariosRef, where("username", "==", selectedUser));
+          const querySnapshot = await getDocs(q);
+
+          if (querySnapshot.empty) {
+            Swal.fire("Error", "Usuario no encontrado.", "error");
+            return;
+          }
+
+          let userData;
+          querySnapshot.forEach((docSnap) => {
+            userData = docSnap.data();
+          });
+
+          if (!userData) {
+            Swal.fire("Error", "Usuario no encontrado.", "error");
+            return;
+          }
+
+          if (userData.password !== passwordInput) {
+            Swal.fire("Error", "Contraseña incorrecta.", "error");
+            return;
+          }
+
+          // Login exitoso: guardar datos en localStorage
+          localStorage.setItem("loggedUser", userData.username);
+          localStorage.setItem("loggedUserRole", userData.rol || "");        // <--- Guardar rol
+          localStorage.setItem("loggedUserStore", userData.tienda || "");    // <--- Guardar tienda si no es admin
+
+          // Redirigir a la página principal, por ejemplo index.html
+          window.location.href = "index.html";
+        } catch (error) {
+          console.error("Error en login:", error);
+          Swal.fire("Error", "Error en login: " + error.message, "error");
+        }
+      }
+
+      // Al cargar la página, cargar la lista de usuarios
+      document.addEventListener("DOMContentLoaded", () => {
+        loadUsers();
+        document.getElementById("btnLogin").addEventListener("click", handleLogin);
+      });
+    </script>
+  </head>
+
+  <body>
+    <div class="container mt-5">
+      <h1>Login</h1>
+      <!-- Sección de login -->
+      <div id="loginSection" class="card p-3 mb-3">
+        <div class="mb-3">
+          <label for="userSelect" class="form-label">Usuario</label>
+          <select id="userSelect" class="form-select"></select>
+        </div>
+        <div class="mb-3">
+          <label for="passwordInput" class="form-label">Contraseña</label>
+          <input type="password" id="passwordInput" class="form-control" />
+        </div>
+        <button id="btnLogin" class="btn btn-primary">Login</button>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>

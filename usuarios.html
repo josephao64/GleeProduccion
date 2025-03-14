@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Administración de Usuarios</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome (para íconos) -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+      body {
+        padding: 20px;
+      }
+    </style>
+  </head>
+  
+  <body>
+    <div class="container">
+      <h1 class="mb-4">Administración de Usuarios</h1>
+      <!-- Botón para crear usuario -->
+      <button id="btnCrearUsuario" class="btn btn-primary mb-3">
+        Crear Usuario
+      </button>
+      <table class="table table-bordered" id="usersTable">
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Contraseña</th>
+            <th>Tienda</th>
+            <th>Rol</th>
+            <th>Habilitado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Se cargarán los usuarios dinámicamente -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Modal para Crear/Editar Usuario -->
+    <div class="modal fade" id="userModal" tabindex="-1" aria-labelledby="userModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form id="userForm">
+            <div class="modal-header">
+              <h5 class="modal-title" id="userModalLabel">Crear Usuario</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" id="userId" />
+
+              <div class="mb-3">
+                <label for="username" class="form-label">Usuario</label>
+                <input type="text" id="username" class="form-control" required />
+              </div>
+
+              <!-- Campo de contraseña con toggle de visibilidad -->
+              <div class="mb-3">
+                <label for="password" class="form-label">Contraseña</label>
+                <div class="input-group">
+                  <input type="password" id="password" class="form-control" required />
+                  <span class="input-group-text" id="togglePassword" style="cursor: pointer;">
+                    <i class="fa-solid fa-eye"></i>
+                  </span>
+                </div>
+              </div>
+
+              <div class="mb-3">
+                <label for="userStore" class="form-label">Tienda</label>
+                <select id="userStore" class="form-select">
+                  <!-- Se cargarán las tiendas -->
+                </select>
+                <small class="form-text text-muted">No aplica si el rol es admin.</small>
+              </div>
+
+              <div class="mb-3">
+                <label for="userRole" class="form-label">Rol</label>
+                <select id="userRole" class="form-select" required>
+                  <!-- Se cargarán los roles -->
+                </select>
+                <!-- Botón para abrir la ventana de Roles -->
+                <button type="button" id="btnAdministrarRoles" class="btn btn-link">
+                  Administrar Roles
+                </button>
+              </div>
+
+              <!-- Sección para permisos personalizados -->
+              <div class="mb-3">
+                <label class="form-label">Permisos Personalizados</label>
+                <!-- Permisos para Productos -->
+                <fieldset class="border p-2 mb-2">
+                  <legend class="w-auto mb-0">Permisos Productos</legend>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="permCrearProducto" />
+                    <label class="form-check-label" for="permCrearProducto">Crear Producto</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="permEditarProducto" />
+                    <label class="form-check-label" for="permEditarProducto">Editar Producto</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="permEliminarProducto" />
+                    <label class="form-check-label" for="permEliminarProducto">Eliminar Producto</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="permModificarStock" />
+                    <label class="form-check-label" for="permModificarStock">Modificar Stock</label>
+                  </div>
+                </fieldset>
+                <!-- Otros permisos -->
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="permEntradasUser" />
+                  <label class="form-check-label" for="permEntradasUser">Entradas</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="permMovimientosUser" />
+                  <label class="form-check-label" for="permMovimientosUser">Movimientos</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="permSalidasUser" />
+                  <label class="form-check-label" for="permSalidasUser">Salidas</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="permUsuariosUser" />
+                  <label class="form-check-label" for="permUsuariosUser">Usuarios</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="permTiendasUser" />
+                  <label class="form-check-label" for="permTiendasUser">Tiendas</label>
+                </div>
+                <small class="form-text text-muted">Estos permisos reemplazan los del rol asignado.</small>
+              </div>
+
+              <div class="mb-3">
+                <label class="form-label">Habilitado</label>
+                <select id="userEnabled" class="form-select">
+                  <option value="true">Sí</option>
+                  <option value="false">No</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                Cancelar
+              </button>
+              <button type="submit" class="btn btn-primary">Guardar Usuario</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal para Gestión de Roles -->
+    <div class="modal fade" id="roleModal" tabindex="-1" aria-labelledby="roleModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="roleModalLabel">Administrar Roles</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+          </div>
+          <div class="modal-body">
+            <button class="btn btn-primary mb-3" onclick="showRoleForm()">Crear Rol</button>
+            <table class="table table-bordered" id="rolesTable">
+              <thead>
+                <tr>
+                  <th>Rol</th>
+                  <th>Permisos</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Se cargarán los roles dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal para Crear/Editar Rol -->
+    <div class="modal fade" id="roleEditModal" tabindex="-1" aria-labelledby="roleEditModalLabel" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <form id="roleForm">
+            <div class="modal-header">
+              <h5 class="modal-title" id="roleEditModalLabel">Crear Rol</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body">
+              <input type="hidden" id="roleId" />
+              <div class="mb-3">
+                <label for="roleName" class="form-label">Nombre del Rol</label>
+                <input type="text" id="roleName" class="form-control" required />
+              </div>
+              <div class="mb-3">
+                <label class="form-label">Permisos</label>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="permProductosRole" />
+                  <label class="form-check-label" for="permProductosRole">Productos</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="permEntradasRole" />
+                  <label class="form-check-label" for="permEntradasRole">Entradas</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="permMovimientosRole" />
+                  <label class="form-check-label" for="permMovimientosRole">Movimientos</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="permSalidasRole" />
+                  <label class="form-check-label" for="permSalidasRole">Salidas</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="permUsuariosRole" />
+                  <label class="form-check-label" for="permUsuariosRole">Usuarios</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" id="permTiendasRole" />
+                  <label class="form-check-label" for="permTiendasRole">Tiendas</label>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                Cancelar
+              </button>
+              <button type="submit" class="btn btn-primary">Guardar Rol</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Script principal con type="module" -->
+    <script type="module">
+      /************************************************
+       * IMPORTAR CONFIGURACIÓN DE FIREBASE Y FUNCIONES
+       ************************************************/
+      import { db } from "./firebase-config.js";
+      import {
+        collection,
+        query,
+        orderBy,
+        where,
+        getDocs,
+        addDoc,
+        updateDoc,
+        doc,
+        deleteDoc,
+        getDoc
+      } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+      console.log("Verificando db:", db);
+
+      /************************************************
+       * CONFIGURACIÓN DE PERMISOS DEL USUARIO
+       ************************************************/
+      const loggedUser     = localStorage.getItem("loggedUser") || "";
+      const loggedUserRole = localStorage.getItem("loggedUserRole") || "";
+      let userPermissions = {
+        crearUsuario: false,
+        editarUsuario: false,
+        eliminarUsuario: false,
+        toggleUsuario: false,
+        administrarRoles: false
+      };
+
+      if (loggedUserRole.toLowerCase() === "admin") {
+        // El admin tiene todos los permisos
+        userPermissions = {
+          crearUsuario: true,
+          editarUsuario: true,
+          eliminarUsuario: true,
+          toggleUsuario: true,
+          administrarRoles: true
+        };
+      } else {
+        const storedPermissions = localStorage.getItem("loggedUserPermissions");
+        if (storedPermissions) {
+          try {
+            userPermissions = JSON.parse(storedPermissions);
+          } catch (error) {
+            console.error("Error al parsear permisos del usuario:", error);
+          }
+        }
+      }
+
+      /************************************************
+       * VARIABLES GLOBALES Y CARGA DE DATOS
+       ************************************************/
+      let users = [];
+      let roles = [];
+      let stores = [];
+
+      async function ensureAdminRole() {
+        try {
+          const rolesRef = collection(db, "roles");
+          const qRoles = query(rolesRef, where("roleName", "==", "admin"));
+          const snapshot = await getDocs(qRoles);
+          if (snapshot.empty) {
+            await addDoc(rolesRef, {
+              roleName: "admin",
+              roleDescription: "Rol de administrador con todos los permisos",
+              permissions: {
+                productos: true,
+                entradas: true,
+                movimientos: true,
+                salidas: true,
+                usuarios: true,
+                tiendas: true
+              }
+            });
+          }
+        } catch (error) {
+          console.error("Error asegurando rol admin:", error);
+        }
+      }
+
+      async function loadStores() {
+        try {
+          const tiendasRef = collection(db, "tiendas");
+          const qTiendas = query(tiendasRef, orderBy("nombre"));
+          const snapshot = await getDocs(qTiendas);
+
+          stores = [];
+          const storeSelect = document.getElementById("userStore");
+          storeSelect.innerHTML = "<option value=''>Seleccione tienda</option>";
+
+          snapshot.forEach((docSnap) => {
+            const store = docSnap.data();
+            store.id = docSnap.id;
+            stores.push(store);
+
+            const option = document.createElement("option");
+            option.value = store.nombre;
+            option.textContent = store.nombre;
+            storeSelect.appendChild(option);
+          });
+        } catch (error) {
+          console.error("Error al cargar tiendas:", error);
+          Swal.fire("Error", "Error al cargar tiendas: " + error.message, "error");
+        }
+      }
+
+      /************************************************
+       * FUNCIONES PARA USUARIOS
+       ************************************************/
+      async function loadUsers() {
+        try {
+          const usuariosRef = collection(db, "usuarios");
+          const qUsuarios = query(usuariosRef, orderBy("username"));
+          const snapshot = await getDocs(qUsuarios);
+
+          users = [];
+          const tbody = document.querySelector("#usersTable tbody");
+          tbody.innerHTML = "";
+
+          snapshot.forEach((docSnap) => {
+            const user = docSnap.data();
+            user.id = docSnap.id;
+            users.push(user);
+
+            const row = tbody.insertRow();
+            row.insertCell(0).textContent = user.username;
+            row.insertCell(1).textContent = user.password;
+            row.insertCell(2).textContent =
+              user.rol && user.rol.toLowerCase() === "admin"
+                ? "-"
+                : (user.tienda || "");
+            row.insertCell(3).textContent = user.rol || "";
+            row.insertCell(4).textContent = user.enabled ? "Sí" : "No";
+
+            const cellActions = row.insertCell(5);
+            let actionsHTML = "";
+            if (userPermissions.editarUsuario) {
+              actionsHTML += `<button class="btn btn-sm btn-primary me-1" onclick="editUser('${user.id}')">Editar</button>`;
+            }
+            if (userPermissions.eliminarUsuario) {
+              actionsHTML += `<button class="btn btn-sm btn-danger me-1" onclick="deleteUser('${user.id}')">Eliminar</button>`;
+            }
+            if (userPermissions.toggleUsuario) {
+              actionsHTML += `<button class="btn btn-sm btn-warning" onclick="toggleUser('${user.id}', ${user.enabled})">
+                ${user.enabled ? "Deshabilitar" : "Habilitar"}
+              </button>`;
+            }
+            cellActions.innerHTML = actionsHTML;
+          });
+        } catch (error) {
+          console.error("Error al cargar usuarios:", error);
+          Swal.fire("Error", "Error al cargar usuarios: " + error.message, "error");
+        }
+      }
+
+      function showUserForm() {
+        document.getElementById("userForm").reset();
+        document.getElementById("userId").value = "";
+        document.getElementById("userModalLabel").textContent = "Crear Usuario";
+
+        // Habilitar campos por defecto
+        document.getElementById("userStore").disabled = false;
+        document.getElementById("userRole").disabled = false;
+
+        new bootstrap.Modal(document.getElementById("userModal")).show();
+      }
+
+      document.getElementById("userForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const userId   = document.getElementById("userId").value;
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value;
+        const tienda   = document.getElementById("userStore").value;
+        const rol      = document.getElementById("userRole").value;
+        const enabled  = document.getElementById("userEnabled").value === "true";
+
+        if (!username || !password) {
+          Swal.fire("Error", "Complete los campos obligatorios (Usuario / Contraseña).", "error");
+          return;
+        }
+
+        // Recopilar permisos personalizados, incluyendo los de productos de forma granular
+        const formPerms = {
+          crearProducto:   document.getElementById("permCrearProducto").checked,
+          editarProducto:  document.getElementById("permEditarProducto").checked,
+          eliminarProducto:document.getElementById("permEliminarProducto").checked,
+          modificarStock:  document.getElementById("permModificarStock").checked,
+          entradas:        document.getElementById("permEntradasUser").checked,
+          movimientos:     document.getElementById("permMovimientosUser").checked,
+          salidas:         document.getElementById("permSalidasUser").checked,
+          usuarios:        document.getElementById("permUsuariosUser").checked,
+          tiendas:         document.getElementById("permTiendasUser").checked
+        };
+
+        const userData = {
+          username,
+          password,
+          enabled,
+          permissions: formPerms
+        };
+
+        if (username.toLowerCase() === "admin") {
+          userData.rol = "admin";
+          userData.permissions = {
+            crearProducto: true,
+            editarProducto: true,
+            eliminarProducto: true,
+            modificarStock: true,
+            entradas: true,
+            movimientos: true,
+            salidas: true,
+            usuarios: true,
+            tiendas: true
+          };
+        } else {
+          if (rol.toLowerCase() === "admin") {
+            userData.rol = "admin";
+            userData.permissions = {
+              crearProducto: true,
+              editarProducto: true,
+              eliminarProducto: true,
+              modificarStock: true,
+              entradas: true,
+              movimientos: true,
+              salidas: true,
+              usuarios: true,
+              tiendas: true
+            };
+          } else {
+            if (!tienda) {
+              Swal.fire("Error", "Seleccione una tienda.", "error");
+              return;
+            }
+            if (!rol) {
+              Swal.fire("Error", "Seleccione un rol.", "error");
+              return;
+            }
+            userData.rol    = rol;
+            userData.tienda = tienda;
+          }
+        }
+
+        try {
+          if (userId) {
+            const userDoc = doc(db, "usuarios", userId);
+            await updateDoc(userDoc, userData);
+            Swal.fire("Éxito", "Usuario actualizado.", "success");
+          } else {
+            await addDoc(collection(db, "usuarios"), userData);
+            Swal.fire("Éxito", "Usuario creado.", "success");
+          }
+          bootstrap.Modal.getInstance(document.getElementById("userModal")).hide();
+          loadUsers();
+        } catch (error) {
+          console.error("Error al guardar usuario:", error);
+          Swal.fire("Error", "Error al guardar usuario: " + error.message, "error");
+        }
+      });
+
+      window.editUser = async function (userId) {
+        try {
+          const userDocRef = doc(db, "usuarios", userId);
+          const docSnap = await getDoc(userDocRef);
+          if (!docSnap.exists()) {
+            Swal.fire("Error", "Usuario no encontrado.", "error");
+            return;
+          }
+          const user = docSnap.data();
+
+          document.getElementById("userId").value = userId;
+          document.getElementById("username").value = user.username;
+          document.getElementById("password").value = user.password;
+          document.getElementById("userEnabled").value = user.enabled ? "true" : "false";
+
+          if ((user.rol && user.rol.toLowerCase() === "admin") || user.username.toLowerCase() === "admin") {
+            document.getElementById("userStore").value = "";
+            document.getElementById("userStore").disabled = true;
+            document.getElementById("userRole").value = "admin";
+            document.getElementById("userRole").disabled = true;
+          } else {
+            document.getElementById("userStore").disabled = false;
+            document.getElementById("userRole").disabled = false;
+            document.getElementById("userStore").value = user.tienda || "";
+            document.getElementById("userRole").value = user.rol || "";
+          }
+
+          // Asignar permisos personalizados, incluyendo los de productos de forma granular
+          if (user.permissions) {
+            document.getElementById("permCrearProducto").checked = !!user.permissions.crearProducto;
+            document.getElementById("permEditarProducto").checked = !!user.permissions.editarProducto;
+            document.getElementById("permEliminarProducto").checked = !!user.permissions.eliminarProducto;
+            document.getElementById("permModificarStock").checked = !!user.permissions.modificarStock;
+            document.getElementById("permEntradasUser").checked = !!user.permissions.entradas;
+            document.getElementById("permMovimientosUser").checked = !!user.permissions.movimientos;
+            document.getElementById("permSalidasUser").checked = !!user.permissions.salidas;
+            document.getElementById("permUsuariosUser").checked = !!user.permissions.usuarios;
+            document.getElementById("permTiendasUser").checked = !!user.permissions.tiendas;
+          } else {
+            document.getElementById("permCrearProducto").checked = false;
+            document.getElementById("permEditarProducto").checked = false;
+            document.getElementById("permEliminarProducto").checked = false;
+            document.getElementById("permModificarStock").checked = false;
+            document.getElementById("permEntradasUser").checked = false;
+            document.getElementById("permMovimientosUser").checked = false;
+            document.getElementById("permSalidasUser").checked = false;
+            document.getElementById("permUsuariosUser").checked = false;
+            document.getElementById("permTiendasUser").checked = false;
+          }
+
+          document.getElementById("userModalLabel").textContent = "Editar Usuario";
+          new bootstrap.Modal(document.getElementById("userModal")).show();
+        } catch (error) {
+          console.error("Error al cargar usuario:", error);
+          Swal.fire("Error", "Error al cargar usuario: " + error.message, "error");
+        }
+      };
+
+      window.deleteUser = async function (userId) {
+        const result = await Swal.fire({
+          title: "¿Está seguro?",
+          text: "Esta acción eliminará el usuario de forma permanente.",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Sí, eliminar",
+          cancelButtonText: "Cancelar"
+        });
+        if (!result.isConfirmed) return;
+
+        try {
+          await deleteDoc(doc(db, "usuarios", userId));
+          Swal.fire("Éxito", "Usuario eliminado.", "success");
+          loadUsers();
+        } catch (error) {
+          console.error("Error al eliminar usuario:", error);
+          Swal.fire("Error", "Error al eliminar usuario: " + error.message, "error");
+        }
+      };
+
+      window.toggleUser = async function (userId, currentStatus) {
+        try {
+          await updateDoc(doc(db, "usuarios", userId), {
+            enabled: !currentStatus
+          });
+          Swal.fire("Éxito", "Estado del usuario actualizado.", "success");
+          loadUsers();
+        } catch (error) {
+          console.error("Error al actualizar estado:", error);
+          Swal.fire("Error", "Error al actualizar estado: " + error.message, "error");
+        }
+      };
+
+      /************************************************
+       * FUNCIONES PARA ROLES
+       ************************************************/
+      async function loadRoles() {
+        try {
+          await ensureAdminRole();
+
+          const rolesRef = collection(db, "roles");
+          const qRoles = query(rolesRef, orderBy("roleName"));
+          const snapshot = await getDocs(qRoles);
+
+          roles = [];
+          const roleSelect = document.getElementById("userRole");
+          roleSelect.innerHTML = "<option value=''>Seleccione rol</option>";
+
+          snapshot.forEach((docSnap) => {
+            const role = docSnap.data();
+            role.id = docSnap.id;
+            roles.push(role);
+
+            const option = document.createElement("option");
+            option.value = role.roleName;
+            option.textContent = role.roleName;
+            roleSelect.appendChild(option);
+          });
+
+          loadRolesTable();
+        } catch (error) {
+          console.error("Error al cargar roles:", error);
+          Swal.fire("Error", "Error al cargar roles: " + error.message, "error");
+        }
+      }
+
+      function loadRolesTable() {
+        const tbody = document.querySelector("#rolesTable tbody");
+        if (!tbody) return;
+
+        tbody.innerHTML = "";
+        roles.forEach((role) => {
+          const row = tbody.insertRow();
+          row.insertCell(0).textContent = role.roleName;
+
+          const perms = [];
+          if (role.permissions) {
+            for (const key in role.permissions) {
+              if (role.permissions[key]) perms.push(key);
+            }
+          }
+          row.insertCell(1).textContent = perms.join(", ");
+
+          const cellActions = row.insertCell(2);
+          cellActions.innerHTML = `
+            <button class="btn btn-sm btn-primary me-1" onclick="editRole('${role.id}')">Editar</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteRole('${role.id}')">Eliminar</button>
+          `;
+        });
+      }
+
+      function showRoleModal() {
+        loadRoles();
+        new bootstrap.Modal(document.getElementById("roleModal")).show();
+      }
+
+      function showRoleForm() {
+        document.getElementById("roleForm").reset();
+        document.getElementById("roleId").value = "";
+        document.getElementById("roleEditModalLabel").textContent = "Crear Rol";
+        new bootstrap.Modal(document.getElementById("roleEditModal")).show();
+      }
+
+      document.getElementById("roleForm").addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const roleId   = document.getElementById("roleId").value;
+        const roleName = document.getElementById("roleName").value.trim();
+        if (!roleName) {
+          Swal.fire("Error", "Ingrese un nombre de rol.", "error");
+          return;
+        }
+
+        const rolePerms = {
+          productos:   document.getElementById("permProductosRole").checked,
+          entradas:    document.getElementById("permEntradasRole").checked,
+          movimientos: document.getElementById("permMovimientosRole").checked,
+          salidas:     document.getElementById("permSalidasRole").checked,
+          usuarios:    document.getElementById("permUsuariosRole").checked,
+          tiendas:     document.getElementById("permTiendasRole").checked
+        };
+
+        try {
+          if (roleId) {
+            await updateDoc(doc(db, "roles", roleId), {
+              roleName,
+              permissions: rolePerms
+            });
+            Swal.fire("Éxito", "Rol actualizado.", "success");
+          } else {
+            await addDoc(collection(db, "roles"), {
+              roleName,
+              permissions: rolePerms
+            });
+            Swal.fire("Éxito", "Rol creado.", "success");
+          }
+          bootstrap.Modal.getInstance(document.getElementById("roleEditModal")).hide();
+          loadRoles();
+        } catch (error) {
+          console.error("Error al guardar rol:", error);
+          Swal.fire("Error", "Error al guardar rol: " + error.message, "error");
+        }
+      });
+
+      window.editRole = async function (roleId) {
+        try {
+          const roleDocRef = doc(db, "roles", roleId);
+          const docSnap = await getDoc(roleDocRef);
+          if (!docSnap.exists()) {
+            Swal.fire("Error", "Rol no encontrado.", "error");
+            return;
+          }
+
+          const roleData = docSnap.data();
+          document.getElementById("roleId").value = roleId;
+          document.getElementById("roleName").value = roleData.roleName || "";
+
+          document.getElementById("permProductosRole").checked = !!roleData.permissions?.productos;
+          document.getElementById("permEntradasRole").checked = !!roleData.permissions?.entradas;
+          document.getElementById("permMovimientosRole").checked = !!roleData.permissions?.movimientos;
+          document.getElementById("permSalidasRole").checked = !!roleData.permissions?.salidas;
+          document.getElementById("permUsuariosRole").checked = !!roleData.permissions?.usuarios;
+          document.getElementById("permTiendasRole").checked = !!roleData.permissions?.tiendas;
+
+          document.getElementById("roleEditModalLabel").textContent = "Editar Rol";
+          new bootstrap.Modal(document.getElementById("roleEditModal")).show();
+        } catch (error) {
+          console.error("Error al cargar rol:", error);
+          Swal.fire("Error", "Error al cargar rol: " + error.message, "error");
+        }
+      };
+
+      window.deleteRole = async function (roleId) {
+        const result = await Swal.fire({
+          title: "¿Está seguro?",
+          text: "Esta acción eliminará el rol de forma permanente.",
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Sí, eliminar",
+          cancelButtonText: "Cancelar"
+        });
+        if (!result.isConfirmed) return;
+
+        try {
+          await deleteDoc(doc(db, "roles", roleId));
+          Swal.fire("Éxito", "Rol eliminado.", "success");
+          loadRoles();
+        } catch (error) {
+          console.error("Error al eliminar rol:", error);
+          Swal.fire("Error", "Error al eliminar rol: " + error.message, "error");
+        }
+      };
+
+      /************************************************
+       * INICIALIZACIÓN DE LA PÁGINA Y ASIGNACIÓN DE EVENTOS
+       ************************************************/
+      document.addEventListener("DOMContentLoaded", async () => {
+        await loadStores();
+        await loadRoles();
+        loadUsers();
+
+        // Asignar evento al botón "Crear Usuario" según permisos
+        const btnCrearUsuario = document.getElementById("btnCrearUsuario");
+        if (!userPermissions.crearUsuario) {
+          btnCrearUsuario.style.display = "none";
+        } else {
+          btnCrearUsuario.addEventListener("click", showUserForm);
+        }
+
+        // Asignar evento al botón "Administrar Roles" según permisos
+        const btnAdministrarRoles = document.getElementById("btnAdministrarRoles");
+        if (!userPermissions.administrarRoles) {
+          btnAdministrarRoles.style.display = "none";
+        } else {
+          btnAdministrarRoles.addEventListener("click", showRoleModal);
+        }
+      });
+
+      // Listener para toggle de contraseña y control del select de rol
+      document.addEventListener("DOMContentLoaded", () => {
+        const togglePassword = document.getElementById("togglePassword");
+        if (togglePassword) {
+          togglePassword.addEventListener("click", function () {
+            const passwordInput = document.getElementById("password");
+            const icon = this.querySelector("i");
+            if (passwordInput.type === "password") {
+              passwordInput.type = "text";
+              icon.classList.remove("fa-eye");
+              icon.classList.add("fa-eye-slash");
+            } else {
+              passwordInput.type = "password";
+              icon.classList.remove("fa-eye-slash");
+              icon.classList.add("fa-eye");
+            }
+          });
+        }
+
+        document.getElementById("userRole").addEventListener("change", function () {
+          const storeSelect = document.getElementById("userStore");
+          if (this.value.toLowerCase() === "admin") {
+            storeSelect.value = "";
+            storeSelect.disabled = true;
+          } else {
+            storeSelect.disabled = false;
+          }
+        });
+      });
+    </script>
+  </body>
+</html>

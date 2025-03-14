@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Productos</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <style>
+      body {
+        padding: 20px;
+      }
+      .table-active {
+        background-color: #d1ecf1 !important;
+      }
+      .swal2-input,
+      .swal2-select {
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Encabezado dinámico: Tienda actual o total -->
+      <h2 id="inventoryTitle"></h2>
+      <h1 class="mb-4">Productos</h1>
+
+      <!-- Filtro de tienda para admin -->
+      <div id="adminStoreFilter" class="mb-3" style="display: none;">
+        <label for="storeSelect" class="form-label">Filtrar por tienda:</label>
+        <select id="storeSelect" class="form-select">
+          <option value="">Inventario: Stock Total</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <button id="btnCrearProducto" class="btn btn-primary me-2">
+          Crear Producto
+        </button>
+        <button id="btnEditarProducto" class="btn btn-warning me-2">
+          Editar Producto
+        </button>
+        <button id="btnEliminarProducto" class="btn btn-danger me-2">
+          Eliminar Producto
+        </button>
+        <button id="btnModificarStock" class="btn btn-secondary me-2">
+          Modificar Stock
+        </button>
+        <!-- Botón exclusivo para admin para cargar productos con cadena de texto -->
+        <button id="btnCargarTexto" class="btn btn-info">
+          Cargar con cadena de texto
+        </button>
+      </div>
+
+      <table class="table table-bordered" id="productsTable">
+        <thead class="table-light">
+          <tr>
+            <th>Código</th>
+            <th>Descripción</th>
+            <th>Talla</th>
+            <th>Precio</th>
+            <th>Stock</th>
+          </tr>
+        </thead>
+        <tbody id="productsBody">
+          <!-- Se renderizan los productos aquí -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Script principal con type="module" -->
+    <script type="module">
+      import { db } from "./firebase-config.js"; // Ajusta la ruta según tu proyecto
+      import {
+        collection,
+        addDoc,
+        updateDoc,
+        deleteDoc,
+        doc,
+        onSnapshot,
+        query,
+        orderBy,
+        getDocs
+      } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+      console.log("Verificando db =>", db);
+
+      // Variables globales
+      let products = [];
+      let selectedProductId = null;
+
+      // Leer datos del usuario (rol y tienda) desde localStorage
+      const loggedUser      = localStorage.getItem("loggedUser") || "";
+      const loggedUserRole  = localStorage.getItem("loggedUserRole") || "";
+      const loggedUserStore = localStorage.getItem("loggedUserStore") || "DefaultStore";
+
+      // Leer permisos del usuario (se espera un JSON con permisos individuales)
+      let userPermissions = {
+        crearProducto: false,
+        editarProducto: false,
+        eliminarProducto: false,
+        modificarStock: false
+      };
+
+      if (loggedUserRole.toLowerCase() === "admin") {
+        // El administrador tiene todos los permisos
+        userPermissions = {
+          crearProducto: true,
+          editarProducto: true,
+          eliminarProducto: true,
+          modificarStock: true
+        };
+      } else {
+        const storedPermissions = localStorage.getItem("loggedUserPermissions");
+        if (storedPermissions) {
+          try {
+            userPermissions = JSON.parse(storedPermissions);
+          } catch (error) {
+            console.error("Error al parsear permisos del usuario:", error);
+          }
+        }
+      }
+
+      // Variable que define la tienda actual para el filtrado de stock
+      let currentStore = "";
+
+      // Configuración según rol
+      if (loggedUserRole.toLowerCase() === "admin") {
+        document.getElementById("adminStoreFilter").style.display = "block";
+        document.getElementById("inventoryTitle").textContent = "Inventario: Stock Total";
+      } else {
+        currentStore = loggedUserStore;
+        document.getElementById("inventoryTitle").textContent = `Inventario de: ${currentStore}`;
+      }
+
+      // Función para cargar tiendas en el select (solo admin)
+      async function loadStoreFilter() {
+        try {
+          const qStores = query(collection(db, "tiendas"), orderBy("nombre"));
+          const snapshot = await getDocs(qStores);
+          const storeSelect = document.getElementById("storeSelect");
+          storeSelect.innerHTML = "<option value=''>Inventario: Stock Total</option>";
+          snapshot.forEach((docSnap) => {
+            const store = docSnap.data();
+            const option = document.createElement("option");
+            option.value = store.nombre;
+            option.textContent = store.nombre;
+            storeSelect.appendChild(option);
+          });
+        } catch (error) {
+          console.error("Error al cargar tiendas:", error);
+        }
+      }
+
+      // Configuración del select de tiendas para admin
+      if (loggedUserRole.toLowerCase() === "admin") {
+        document.addEventListener("DOMContentLoaded", () => {
+          loadStoreFilter();
+          document.getElementById("storeSelect").addEventListener("change", function () {
+            currentStore = this.value;
+            document.getElementById("inventoryTitle").textContent = currentStore
+              ? `Inventario de: ${currentStore}`
+              : "Inventario: Stock Total";
+            // Reactivar la escucha para filtrar los productos
+            listenProducts();
+          });
+        });
+      }
+
+      // Función para escuchar en tiempo real la colección "productos"
+      function listenProducts() {
+        const qProducts = query(
+          collection(db, "productos"),
+          orderBy("createdAt", "desc")
+        );
+        onSnapshot(
+          qProducts,
+          (snapshot) => {
+            products = [];
+            snapshot.forEach((docSnap) => {
+              const prod = docSnap.data();
+              prod.id = docSnap.id;
+              products.push(prod);
+            });
+            renderProducts();
+          },
+          (error) => {
+            console.error("Error en onSnapshot:", error);
+            Swal.fire(
+              "Error",
+              "No se pudieron obtener los productos: " + error.message,
+              "error"
+            );
+          }
+        );
+      }
+
+      // Función para renderizar los productos en la tabla
+      function renderProducts() {
+        const tbody = document.getElementById("productsBody");
+        tbody.innerHTML = "";
+        if (products.length === 0) {
+          tbody.innerHTML =
+            "<tr><td colspan='5' class='text-center'>No hay productos disponibles</td></tr>";
+          return;
+        }
+        products.forEach((prod) => {
+          const tr = document.createElement("tr");
+          const displayedStock = getDisplayedStock(prod);
+          tr.innerHTML = `
+            <td>${prod.codigo}</td>
+            <td>${prod.descripcion}</td>
+            <td>${prod.talla || ""}</td>
+            <td>Q ${parseFloat(prod.precio).toFixed(2)}</td>
+            <td>${displayedStock}</td>
+          `;
+          tr.addEventListener("click", () => {
+            document
+              .querySelectorAll("#productsBody tr")
+              .forEach((row) => row.classList.remove("table-active"));
+            tr.classList.add("table-active");
+            selectedProductId = prod.id;
+          });
+          tbody.appendChild(tr);
+        });
+      }
+
+      // Calcula el stock a mostrar según rol y tienda actual
+      function getDisplayedStock(product) {
+        if (!product.stock || typeof product.stock !== "object") {
+          return product.stock || 0;
+        }
+        if (loggedUserRole.toLowerCase() === "admin" && !currentStore) {
+          return Object.values(product.stock).reduce(
+            (sum, val) => sum + Number(val),
+            0
+          );
+        }
+        if (loggedUserRole.toLowerCase() === "admin" && currentStore) {
+          return product.stock[currentStore] || 0;
+        }
+        return product.stock[currentStore] || 0;
+      }
+
+      /*********************************************
+       * FUNCIONES CRUD PARA PRODUCTOS
+       *********************************************/
+      async function crearProducto() {
+        const { value: formValues } = await Swal.fire({
+          title: "Crear Producto",
+          html: `
+            <input id="swal-input1" class="swal2-input" placeholder="Código">
+            <input id="swal-input2" class="swal2-input" placeholder="Descripción">
+            <input id="swal-input3" class="swal2-input" placeholder="Talla (opcional)">
+            <input id="swal-input4" class="swal2-input" placeholder="Precio" type="number" min="0.01" step="0.01">
+          `,
+          focusConfirm: false,
+          preConfirm: () => {
+            const codigo = document.getElementById("swal-input1").value.trim();
+            const descripcion = document.getElementById("swal-input2").value.trim();
+            const talla = document.getElementById("swal-input3").value.trim();
+            const precio = parseFloat(document.getElementById("swal-input4").value);
+            if (!codigo) {
+              Swal.showValidationMessage("El código es obligatorio");
+              return;
+            }
+            if (!descripcion) {
+              Swal.showValidationMessage("La descripción es obligatoria");
+              return;
+            }
+            if (isNaN(precio) || precio <= 0) {
+              Swal.showValidationMessage("El precio debe ser mayor a 0");
+              return;
+            }
+            return { codigo, descripcion, talla, precio };
+          }
+        });
+        if (!formValues) return;
+        try {
+          const newProduct = {
+            codigo: formValues.codigo,
+            descripcion: formValues.descripcion,
+            talla: formValues.talla,
+            precio: formValues.precio,
+            stock: {},  // Para productos creados individualmente se inicializa como objeto
+            createdAt: new Date().toISOString()
+          };
+          await addDoc(collection(db, "productos"), newProduct);
+          Swal.fire("Producto creado", "El producto se creó correctamente", "success");
+        } catch (error) {
+          Swal.fire("Error", "No se pudo crear el producto: " + error.message, "error");
+        }
+      }
+
+      async function editarProducto() {
+        if (!selectedProductId) {
+          Swal.fire("Advertencia", "Selecciona un producto para editar", "warning");
+          return;
+        }
+        const product = products.find((p) => p.id === selectedProductId);
+        if (!product) {
+          Swal.fire("Error", "Producto no encontrado", "error");
+          return;
+        }
+        const { value: formValues } = await Swal.fire({
+          title: "Editar Producto",
+          html: `
+            <input id="swal-input1" class="swal2-input" placeholder="Código" value="${product.codigo}">
+            <input id="swal-input2" class="swal2-input" placeholder="Descripción" value="${product.descripcion}">
+            <input id="swal-input3" class="swal2-input" placeholder="Talla (opcional)" value="${product.talla || ''}">
+            <input id="swal-input4" class="swal2-input" placeholder="Precio" type="number" min="0.01" step="0.01" value="${product.precio}">
+          `,
+          focusConfirm: false,
+          preConfirm: () => {
+            const codigo = document.getElementById("swal-input1").value.trim();
+            const descripcion = document.getElementById("swal-input2").value.trim();
+            const talla = document.getElementById("swal-input3").value.trim();
+            const precio = parseFloat(document.getElementById("swal-input4").value);
+            if (!codigo) {
+              Swal.showValidationMessage("El código es obligatorio");
+              return;
+            }
+            if (!descripcion) {
+              Swal.showValidationMessage("La descripción es obligatoria");
+              return;
+            }
+            if (isNaN(precio) || precio <= 0) {
+              Swal.showValidationMessage("El precio debe ser mayor a 0");
+              return;
+            }
+            return { codigo, descripcion, talla, precio };
+          }
+        });
+        if (!formValues) return;
+        try {
+          const updateData = {
+            codigo: formValues.codigo,
+            descripcion: formValues.descripcion,
+            talla: formValues.talla,
+            precio: formValues.precio
+          };
+          await updateDoc(doc(db, "productos", selectedProductId), updateData);
+          Swal.fire("Producto editado", "El producto se actualizó correctamente", "success");
+        } catch (error) {
+          Swal.fire("Error", "No se pudo editar el producto: " + error.message, "error");
+        }
+      }
+
+      async function eliminarProducto() {
+        if (!selectedProductId) {
+          Swal.fire("Advertencia", "Selecciona un producto para eliminar", "warning");
+          return;
+        }
+        const product = products.find((p) => p.id === selectedProductId);
+        if (!product) {
+          Swal.fire("Error", "Producto no encontrado", "error");
+          return;
+        }
+        const confirmResult = await Swal.fire({
+          title: "¿Eliminar Producto?",
+          text: `¿Estás seguro de eliminar "${product.descripcion}"?`,
+          icon: "warning",
+          showCancelButton: true,
+          confirmButtonText: "Sí, eliminar",
+          cancelButtonText: "Cancelar"
+        });
+        if (!confirmResult.isConfirmed) return;
+        try {
+          await deleteDoc(doc(db, "productos", selectedProductId));
+          Swal.fire("Eliminado", "El producto se eliminó correctamente", "success");
+          selectedProductId = null;
+        } catch (error) {
+          Swal.fire("Error", "No se pudo eliminar el producto: " + error.message, "error");
+        }
+      }
+
+      async function modificarStock() {
+        if (!selectedProductId) {
+          Swal.fire("Advertencia", "Selecciona un producto para modificar el stock", "warning");
+          return;
+        }
+        const product = products.find((p) => p.id === selectedProductId);
+        if (!product) {
+          Swal.fire("Error", "Producto no encontrado", "error");
+          return;
+        }
+        if (loggedUserRole.toLowerCase() === "admin" && !currentStore) {
+          Swal.fire(
+            "Tienda no seleccionada",
+            "Debes elegir una tienda en el filtro para modificar stock",
+            "info"
+          );
+          return;
+        }
+        const currentStock = getCurrentStock(product, currentStore);
+        const { value: newStock } = await Swal.fire({
+          title: "Modificar Stock",
+          input: "number",
+          inputLabel: `Ingresa el nuevo stock para la tienda: ${currentStore || "Global"}`,
+          inputValue: currentStock,
+          showCancelButton: true,
+          inputValidator: (value) => {
+            if ((!value && value !== 0) || isNaN(value)) {
+              return "Debes ingresar un valor de stock";
+            }
+            if (value < 0) {
+              return "El stock debe ser un número no negativo";
+            }
+          }
+        });
+        if (newStock !== undefined) {
+          try {
+            const updatedStock = product.stock && typeof product.stock === "object"
+              ? { ...product.stock }
+              : {};
+            const storeKey = currentStore;
+            updatedStock[storeKey] = Number(newStock);
+            await updateDoc(doc(db, "productos", selectedProductId), { stock: updatedStock });
+            Swal.fire("Stock actualizado", "El stock fue actualizado correctamente", "success");
+          } catch (error) {
+            Swal.fire("Error", "No se pudo actualizar el stock: " + error.message, "error");
+          }
+        }
+      }
+
+      function getCurrentStock(product, store) {
+        if (!product.stock || typeof product.stock !== "object") {
+          return product.stock || 0;
+        }
+        if (loggedUserRole.toLowerCase() === "admin" && !store) {
+          return 0;
+        }
+        return product.stock[store] || 0;
+      }
+
+      // Función para cargar múltiples productos desde una cadena de texto (solo para admin)
+      async function cargarConCadenaTexto() {
+        const { value: cadena } = await Swal.fire({
+          title: "Cargar Productos",
+          input: "textarea",
+          inputLabel: "Ingresa cada producto en una nueva línea con el formato:",
+          inputPlaceholder: "Ej:\nP001, Camisa, M, 29.99, 10\nP002, Pantalón, L, 39.99, 5",
+          showCancelButton: true,
+          preConfirm: (value) => {
+            if (!value) {
+              Swal.showValidationMessage("Debes ingresar al menos una línea");
+            }
+            return value;
+          }
+        });
+        if (!cadena) return;
+        const lines = cadena.split(/\r?\n/);
+        let validProducts = [];
+        let invalidLines = [];
+        lines.forEach((line, index) => {
+          if (line.trim() === "") return;
+          const parts = line.split(",");
+          if (parts.length !== 5) {
+            invalidLines.push(`Línea ${index + 1}: formato incorrecto.`);
+            return;
+          }
+          const codigo = parts[0].trim();
+          const descripcion = parts[1].trim();
+          const talla = parts[2].trim();
+          const precio = parseFloat(parts[3].trim());
+          const stock = parseFloat(parts[4].trim());
+          if (!codigo) {
+            invalidLines.push(`Línea ${index + 1}: código vacío.`);
+            return;
+          }
+          if (!descripcion) {
+            invalidLines.push(`Línea ${index + 1}: descripción vacía.`);
+            return;
+          }
+          if (isNaN(precio) || precio <= 0) {
+            invalidLines.push(`Línea ${index + 1}: precio inválido.`);
+            return;
+          }
+          if (isNaN(stock) || stock < 0) {
+            invalidLines.push(`Línea ${index + 1}: stock inválido.`);
+            return;
+          }
+          validProducts.push({
+            codigo,
+            descripcion,
+            talla,
+            precio,
+            stock, // Se asigna directamente el stock ingresado
+            createdAt: new Date().toISOString()
+          });
+        });
+        if (validProducts.length === 0) {
+          Swal.fire("Error", "No se encontraron productos válidos. " + invalidLines.join(" "), "error");
+          return;
+        }
+        try {
+          await Promise.all(
+            validProducts.map((product) => addDoc(collection(db, "productos"), product))
+          );
+          let msg = `${validProducts.length} producto(s) creado(s) correctamente.`;
+          if (invalidLines.length > 0) {
+            msg += "\nLas siguientes líneas fueron ignoradas:\n" + invalidLines.join("\n");
+          }
+          Swal.fire("Productos creados", msg, "success");
+        } catch (error) {
+          Swal.fire("Error", "No se pudieron crear algunos productos: " + error.message, "error");
+        }
+      }
+
+      /*********************************************
+       * INICIALIZACIÓN DE LA PÁGINA Y ASIGNACIÓN DE EVENTOS
+       *********************************************/
+      document.addEventListener("DOMContentLoaded", () => {
+        listenProducts();
+
+        // Asignar eventos a los botones según permisos
+        const btnCrearProducto = document.getElementById("btnCrearProducto");
+        const btnEditarProducto = document.getElementById("btnEditarProducto");
+        const btnEliminarProducto = document.getElementById("btnEliminarProducto");
+        const btnModificarStock = document.getElementById("btnModificarStock");
+        const btnCargarTexto = document.getElementById("btnCargarTexto");
+
+        if (!userPermissions.crearProducto) {
+          btnCrearProducto.style.display = "none";
+        } else {
+          btnCrearProducto.addEventListener("click", crearProducto);
+        }
+
+        if (!userPermissions.editarProducto) {
+          btnEditarProducto.style.display = "none";
+        } else {
+          btnEditarProducto.addEventListener("click", editarProducto);
+        }
+
+        if (!userPermissions.eliminarProducto) {
+          btnEliminarProducto.style.display = "none";
+        } else {
+          btnEliminarProducto.addEventListener("click", eliminarProducto);
+        }
+
+        if (!userPermissions.modificarStock) {
+          btnModificarStock.style.display = "none";
+        } else {
+          btnModificarStock.addEventListener("click", modificarStock);
+        }
+
+        // El botón "Cargar con cadena de texto" solo se muestra para admin
+        if (loggedUserRole.toLowerCase() === "admin") {
+          btnCargarTexto.style.display = "inline-block";
+          btnCargarTexto.addEventListener("click", cargarConCadenaTexto);
+        } else {
+          btnCargarTexto.style.display = "none";
+        }
+      });
+    </script>
+  </body>
+</html>
