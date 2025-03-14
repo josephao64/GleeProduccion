@@ -98,12 +98,15 @@
               <!-- Sección para permisos personalizados -->
               <div class="mb-3">
                 <label class="form-label">Permisos Personalizados</label>
-                <!-- Permisos para Productos -->
+                <!-- Permisos para Productos con sub-opciones -->
                 <fieldset class="border p-2 mb-2">
-                  <legend class="w-auto mb-0">Permisos Productos</legend>
+                  <legend class="w-auto mb-0">
+                    <input class="form-check-input" type="checkbox" id="permProductos" />
+                    <label class="form-check-label" for="permProductos"> Productos</label>
+                  </legend>
                   <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="permCrearProducto" />
-                    <label class="form-check-label" for="permCrearProducto">Crear Producto</label>
+                    <input class="form-check-input" type="checkbox" id="permAgregarProducto" />
+                    <label class="form-check-label" for="permAgregarProducto">Agregar Producto</label>
                   </div>
                   <div class="form-check">
                     <input class="form-check-input" type="checkbox" id="permEditarProducto" />
@@ -114,8 +117,8 @@
                     <label class="form-check-label" for="permEliminarProducto">Eliminar Producto</label>
                   </div>
                   <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="permModificarStock" />
-                    <label class="form-check-label" for="permModificarStock">Modificar Stock</label>
+                    <input class="form-check-input" type="checkbox" id="permStockProducto" />
+                    <label class="form-check-label" for="permStockProducto">Stock Producto</label>
                   </div>
                 </fieldset>
                 <!-- Otros permisos -->
@@ -317,7 +320,12 @@
               roleName: "admin",
               roleDescription: "Rol de administrador con todos los permisos",
               permissions: {
-                productos: true,
+                productos: {
+                  agregar: true,
+                  editar: true,
+                  eliminar: true,
+                  stock: true
+                },
                 entradas: true,
                 movimientos: true,
                 salidas: true,
@@ -433,17 +441,22 @@
           return;
         }
 
-        // Recopilar permisos personalizados, incluyendo los de productos de forma granular
+        // Recopilar permisos personalizados, incluyendo permisos de productos
+        const productosEnabled = document.getElementById("permProductos").checked;
+        const productPerms = {
+          agregar: productosEnabled ? document.getElementById("permAgregarProducto").checked : false,
+          editar: productosEnabled ? document.getElementById("permEditarProducto").checked : false,
+          eliminar: productosEnabled ? document.getElementById("permEliminarProducto").checked : false,
+          stock: productosEnabled ? document.getElementById("permStockProducto").checked : false
+        };
+
         const formPerms = {
-          crearProducto:   document.getElementById("permCrearProducto").checked,
-          editarProducto:  document.getElementById("permEditarProducto").checked,
-          eliminarProducto:document.getElementById("permEliminarProducto").checked,
-          modificarStock:  document.getElementById("permModificarStock").checked,
-          entradas:        document.getElementById("permEntradasUser").checked,
-          movimientos:     document.getElementById("permMovimientosUser").checked,
-          salidas:         document.getElementById("permSalidasUser").checked,
-          usuarios:        document.getElementById("permUsuariosUser").checked,
-          tiendas:         document.getElementById("permTiendasUser").checked
+          productos: productPerms,
+          entradas: document.getElementById("permEntradasUser").checked,
+          movimientos: document.getElementById("permMovimientosUser").checked,
+          salidas: document.getElementById("permSalidasUser").checked,
+          usuarios: document.getElementById("permUsuariosUser").checked,
+          tiendas: document.getElementById("permTiendasUser").checked
         };
 
         const userData = {
@@ -456,10 +469,12 @@
         if (username.toLowerCase() === "admin") {
           userData.rol = "admin";
           userData.permissions = {
-            crearProducto: true,
-            editarProducto: true,
-            eliminarProducto: true,
-            modificarStock: true,
+            productos: {
+              agregar: true,
+              editar: true,
+              eliminar: true,
+              stock: true
+            },
             entradas: true,
             movimientos: true,
             salidas: true,
@@ -470,10 +485,12 @@
           if (rol.toLowerCase() === "admin") {
             userData.rol = "admin";
             userData.permissions = {
-              crearProducto: true,
-              editarProducto: true,
-              eliminarProducto: true,
-              modificarStock: true,
+              productos: {
+                agregar: true,
+                editar: true,
+                eliminar: true,
+                stock: true
+              },
               entradas: true,
               movimientos: true,
               salidas: true,
@@ -538,22 +555,32 @@
             document.getElementById("userRole").value = user.rol || "";
           }
 
-          // Asignar permisos personalizados, incluyendo los de productos de forma granular
+          // Asignar permisos personalizados, incluyendo permisos de productos
           if (user.permissions) {
-            document.getElementById("permCrearProducto").checked = !!user.permissions.crearProducto;
-            document.getElementById("permEditarProducto").checked = !!user.permissions.editarProducto;
-            document.getElementById("permEliminarProducto").checked = !!user.permissions.eliminarProducto;
-            document.getElementById("permModificarStock").checked = !!user.permissions.modificarStock;
+            if (user.permissions.productos) {
+              document.getElementById("permProductos").checked = true;
+              document.getElementById("permAgregarProducto").checked = !!user.permissions.productos.agregar;
+              document.getElementById("permEditarProducto").checked = !!user.permissions.productos.editar;
+              document.getElementById("permEliminarProducto").checked = !!user.permissions.productos.eliminar;
+              document.getElementById("permStockProducto").checked = !!user.permissions.productos.stock;
+            } else {
+              document.getElementById("permProductos").checked = false;
+              document.getElementById("permAgregarProducto").checked = false;
+              document.getElementById("permEditarProducto").checked = false;
+              document.getElementById("permEliminarProducto").checked = false;
+              document.getElementById("permStockProducto").checked = false;
+            }
             document.getElementById("permEntradasUser").checked = !!user.permissions.entradas;
             document.getElementById("permMovimientosUser").checked = !!user.permissions.movimientos;
             document.getElementById("permSalidasUser").checked = !!user.permissions.salidas;
             document.getElementById("permUsuariosUser").checked = !!user.permissions.usuarios;
             document.getElementById("permTiendasUser").checked = !!user.permissions.tiendas;
           } else {
-            document.getElementById("permCrearProducto").checked = false;
+            document.getElementById("permProductos").checked = false;
+            document.getElementById("permAgregarProducto").checked = false;
             document.getElementById("permEditarProducto").checked = false;
             document.getElementById("permEliminarProducto").checked = false;
-            document.getElementById("permModificarStock").checked = false;
+            document.getElementById("permStockProducto").checked = false;
             document.getElementById("permEntradasUser").checked = false;
             document.getElementById("permMovimientosUser").checked = false;
             document.getElementById("permSalidasUser").checked = false;
@@ -647,8 +674,11 @@
 
           const perms = [];
           if (role.permissions) {
+            if (role.permissions.productos) {
+              perms.push("productos");
+            }
             for (const key in role.permissions) {
-              if (role.permissions[key]) perms.push(key);
+              if (key !== "productos" && role.permissions[key]) perms.push(key);
             }
           }
           row.insertCell(1).textContent = perms.join(", ");
@@ -684,12 +714,12 @@
         }
 
         const rolePerms = {
-          productos:   document.getElementById("permProductosRole").checked,
-          entradas:    document.getElementById("permEntradasRole").checked,
+          productos: document.getElementById("permProductosRole").checked,
+          entradas: document.getElementById("permEntradasRole").checked,
           movimientos: document.getElementById("permMovimientosRole").checked,
-          salidas:     document.getElementById("permSalidasRole").checked,
-          usuarios:    document.getElementById("permUsuariosRole").checked,
-          tiendas:     document.getElementById("permTiendasRole").checked
+          salidas: document.getElementById("permSalidasRole").checked,
+          usuarios: document.getElementById("permUsuariosRole").checked,
+          tiendas: document.getElementById("permTiendasRole").checked
         };
 
         try {

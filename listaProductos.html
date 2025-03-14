@@ -97,12 +97,12 @@
       let products = [];
       let selectedProductId = null;
 
-      // Leer datos del usuario (rol y tienda) desde localStorage
+      // Leer datos del usuario (rol, tienda y permisos) desde localStorage
       const loggedUser      = localStorage.getItem("loggedUser") || "";
       const loggedUserRole  = localStorage.getItem("loggedUserRole") || "";
       const loggedUserStore = localStorage.getItem("loggedUserStore") || "DefaultStore";
 
-      // Leer permisos del usuario (se espera un JSON con permisos individuales)
+      // Definir permisos específicos para productos a partir de la estructura de permisos del usuario
       let userPermissions = {
         crearProducto: false,
         editarProducto: false,
@@ -111,7 +111,7 @@
       };
 
       if (loggedUserRole.toLowerCase() === "admin") {
-        // El administrador tiene todos los permisos
+        // Si es admin, se habilitan todas las acciones
         userPermissions = {
           crearProducto: true,
           editarProducto: true,
@@ -122,7 +122,16 @@
         const storedPermissions = localStorage.getItem("loggedUserPermissions");
         if (storedPermissions) {
           try {
-            userPermissions = JSON.parse(storedPermissions);
+            const parsed = JSON.parse(storedPermissions);
+            // Se verifica que exista la sección de "productos"
+            if (parsed.productos) {
+              userPermissions = {
+                crearProducto: parsed.productos.agregar || false,
+                editarProducto: parsed.productos.editar || false,
+                eliminarProducto: parsed.productos.eliminar || false,
+                modificarStock: parsed.productos.stock || false
+              };
+            }
           } catch (error) {
             console.error("Error al parsear permisos del usuario:", error);
           }
@@ -290,7 +299,7 @@
             descripcion: formValues.descripcion,
             talla: formValues.talla,
             precio: formValues.precio,
-            stock: {},  // Para productos creados individualmente se inicializa como objeto
+            stock: {},  // Se inicializa el stock como objeto vacío
             createdAt: new Date().toISOString()
           };
           await addDoc(collection(db, "productos"), newProduct);
@@ -441,87 +450,13 @@
         return product.stock[store] || 0;
       }
 
-      // Función para cargar múltiples productos desde una cadena de texto (solo para admin)
-      async function cargarConCadenaTexto() {
-        const { value: cadena } = await Swal.fire({
-          title: "Cargar Productos",
-          input: "textarea",
-          inputLabel: "Ingresa cada producto en una nueva línea con el formato:",
-          inputPlaceholder: "Ej:\nP001, Camisa, M, 29.99, 10\nP002, Pantalón, L, 39.99, 5",
-          showCancelButton: true,
-          preConfirm: (value) => {
-            if (!value) {
-              Swal.showValidationMessage("Debes ingresar al menos una línea");
-            }
-            return value;
-          }
-        });
-        if (!cadena) return;
-        const lines = cadena.split(/\r?\n/);
-        let validProducts = [];
-        let invalidLines = [];
-        lines.forEach((line, index) => {
-          if (line.trim() === "") return;
-          const parts = line.split(",");
-          if (parts.length !== 5) {
-            invalidLines.push(`Línea ${index + 1}: formato incorrecto.`);
-            return;
-          }
-          const codigo = parts[0].trim();
-          const descripcion = parts[1].trim();
-          const talla = parts[2].trim();
-          const precio = parseFloat(parts[3].trim());
-          const stock = parseFloat(parts[4].trim());
-          if (!codigo) {
-            invalidLines.push(`Línea ${index + 1}: código vacío.`);
-            return;
-          }
-          if (!descripcion) {
-            invalidLines.push(`Línea ${index + 1}: descripción vacía.`);
-            return;
-          }
-          if (isNaN(precio) || precio <= 0) {
-            invalidLines.push(`Línea ${index + 1}: precio inválido.`);
-            return;
-          }
-          if (isNaN(stock) || stock < 0) {
-            invalidLines.push(`Línea ${index + 1}: stock inválido.`);
-            return;
-          }
-          validProducts.push({
-            codigo,
-            descripcion,
-            talla,
-            precio,
-            stock, // Se asigna directamente el stock ingresado
-            createdAt: new Date().toISOString()
-          });
-        });
-        if (validProducts.length === 0) {
-          Swal.fire("Error", "No se encontraron productos válidos. " + invalidLines.join(" "), "error");
-          return;
-        }
-        try {
-          await Promise.all(
-            validProducts.map((product) => addDoc(collection(db, "productos"), product))
-          );
-          let msg = `${validProducts.length} producto(s) creado(s) correctamente.`;
-          if (invalidLines.length > 0) {
-            msg += "\nLas siguientes líneas fueron ignoradas:\n" + invalidLines.join("\n");
-          }
-          Swal.fire("Productos creados", msg, "success");
-        } catch (error) {
-          Swal.fire("Error", "No se pudieron crear algunos productos: " + error.message, "error");
-        }
-      }
-
       /*********************************************
        * INICIALIZACIÓN DE LA PÁGINA Y ASIGNACIÓN DE EVENTOS
        *********************************************/
       document.addEventListener("DOMContentLoaded", () => {
         listenProducts();
 
-        // Asignar eventos a los botones según permisos
+        // Asignar eventos a los botones según los permisos configurados
         const btnCrearProducto = document.getElementById("btnCrearProducto");
         const btnEditarProducto = document.getElementById("btnEditarProducto");
         const btnEliminarProducto = document.getElementById("btnEliminarProducto");
