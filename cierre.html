@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Historial de Ventas</title>
+    <title>Historial de Cierres de Caja</title>
     <!-- Bootstrap CSS -->
     <link
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
@@ -38,7 +38,7 @@
   </head>
   <body>
     <div class="container">
-      <h1 class="mb-4">Historial de Ventas</h1>
+      <h1 class="mb-4">Historial de Cierres de Caja</h1>
       <!-- Filtro por fecha -->
       <div class="row mb-3">
         <div class="col-md-4">
@@ -46,34 +46,41 @@
           <input type="date" id="filtroFecha" class="form-control" />
         </div>
       </div>
-      <!-- Tabla de ventas -->
+      <!-- Tabla de cierres -->
       <div class="table-responsive">
-        <table id="ventasTable" class="table table-striped table-bordered">
+        <table class="table table-striped" id="tablaCierres">
           <thead>
             <tr>
-              <th>ID VENTA</th>
-              <th>FECHA</th>
-              <th>CLIENTE</th>
-              <th>MONTO TOTAL</th>
-              <th>MÉTODO DE PAGO</th>
-              <th>ESTADO</th>
-              <th>ACCIONES</th>
+              <th>Fecha y Hora</th>
+              <th>Cajero</th>
+              <th>Fondo Apertura</th>
+              <th>Venta Efectivo</th>
+              <th>Venta Tarjeta</th>
+              <th>Venta Total</th>
+              <th>Total Efectivo (Sistema)</th>
+              <th>Total Ingresado (Cajero)</th>
+              <th>Diferencia</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            <!-- Se cargarán dinámicamente desde Firestore -->
+            <!-- Los datos se cargarán dinámicamente desde Firestore -->
           </tbody>
         </table>
       </div>
+      <p id="mensajeSinCierres" class="text-center text-muted" style="display: none;">
+        No hay cierres disponibles.
+      </p>
     </div>
   
-    <!-- Bootstrap JS Bundle -->
+    <!-- Bootstrap Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  
+    <!-- Script principal (Firebase v9 modular) -->
     <script type="module">
-      // Importar Firebase v9 modular
-      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+      // Importar configuración y funciones de Firebase
+      import { db } from "./firebase-config.js";
       import {
-        getFirestore,
         collection,
         query,
         orderBy,
@@ -86,210 +93,259 @@
         getDoc
       } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
   
-      // Configuración de Firebase (ajusta según tu proyecto)
-      const firebaseConfig = {
-        apiKey: "AIzaSyBoBj8-oqIwAOJG7aplYPWt7q4J3wigbmc",
-        authDomain: "gleedb-d9478.firebaseapp.com",
-        projectId: "gleedb-d9478",
-        storageBucket: "gleedb-d9478.firebasestorage.app",
-        messagingSenderId: "722495997438",
-        appId: "1:722495997438:web:19fd9152263a4651feacaf"
-      };
-      const app = initializeApp(firebaseConfig);
-      const db = getFirestore(app);
-  
-      // Variables globales y rol del usuario
-      let tablaVentas;
+      // Obtener el rol del usuario desde localStorage
       const loggedUserRole = (localStorage.getItem("loggedUserRole") || "").toLowerCase();
-      const loggedUser = localStorage.getItem("loggedUser") || "";
   
+      let tablaCierres;
       $(document).ready(function () {
-        tablaVentas = $("#ventasTable").DataTable({
-          language: { url: "https://cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json" },
+        tablaCierres = $("#tablaCierres").DataTable({
+          language: {
+            url: "https://cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json"
+          },
           columns: [
-            { title: "ID VENTA" },
-            { title: "FECHA" },
-            { title: "CLIENTE" },
-            { title: "MONTO TOTAL" },
-            { title: "MÉTODO DE PAGO" },
-            { title: "ESTADO" },
-            { title: "ACCIONES", orderable: false }
+            { title: "Fecha y Hora" },
+            { title: "Cajero" },
+            { title: "Fondo Apertura" },
+            { title: "Venta Efectivo" },
+            { title: "Venta Tarjeta" },
+            { title: "Venta Total" },
+            { title: "Total Efectivo (Sistema)" },
+            { title: "Total Ingresado (Cajero)" },
+            { title: "Diferencia" },
+            { title: "Acciones", orderable: false }
           ],
-          order: [[1, "desc"]],
+          order: [[0, "desc"]],
           responsive: true
         });
-        cargarVentas();
-        $("#filtroFecha").on("change", cargarVentas);
+        cargarCierres();
+  
+        // Evento para filtrar por fecha
+        $("#filtroFecha").on("change", cargarCierres);
       });
   
-      // Función para cargar ventas desde Firestore
-      function cargarVentas() {
-        const ventasQuery = query(collection(db, "ventas"), orderBy("fecha", "desc"));
-        onSnapshot(ventasQuery, (snapshot) => {
-          tablaVentas.clear();
+      // Función para cargar cierres desde Firestore
+      async function cargarCierres() {
+        const filtroFecha = document.getElementById("filtroFecha").value;
+        let cierresQuery;
+  
+        if (filtroFecha) {
+          // Para filtrar por un día, definimos un rango:
+          const start = new Date(filtroFecha);
+          const end = new Date(filtroFecha);
+          end.setDate(end.getDate() + 1);
+          // Suponemos que en la colección "cierres" el campo "fechaCierre" se almacena como una cadena en formato "YYYY-MM-DD"
+          cierresQuery = query(
+            collection(db, "cierres"),
+            where("fechaCierre", ">=", start.toISOString().split("T")[0]),
+            where("fechaCierre", "<", end.toISOString().split("T")[0]),
+            orderBy("fechaCierre", "desc")
+          );
+        } else {
+          cierresQuery = query(collection(db, "cierres"), orderBy("fechaCierre", "desc"));
+        }
+  
+        const snapshot = await getDocs(cierresQuery);
+        tablaCierres.clear();
+  
+        if (snapshot.empty) {
+          document.getElementById("mensajeSinCierres").style.display = "block";
+        } else {
+          document.getElementById("mensajeSinCierres").style.display = "none";
           snapshot.forEach((docSnap) => {
-            let venta = docSnap.data();
-            // Usar el campo "idVenta" (número entero) si existe; sino usar el id del documento
-            let idVentaMostrar = venta.idVenta ? Number(venta.idVenta) : docSnap.id;
-            // Botones de acción
-            let acciones = `<button class="btn btn-sm btn-info" onclick="verDetalleVenta('${docSnap.id}')">VER</button>`;
+            const cierre = docSnap.data();
+            cierre.id = docSnap.id;
+            // Concatenar Fecha y Hora
+            const fechaHora = cierre.fechaCierre + " " + (cierre.horaCierre || "");
+            // Botones de acción: solo admin tiene anular y eliminar
+            let acciones = `<button class="btn btn-sm btn-info" onclick="verDetalleCierre('${docSnap.id}')">VER</button>`;
             if (loggedUserRole === "admin") {
-              acciones += ` <button class="btn btn-sm btn-warning" onclick="anularVenta('${docSnap.id}')">ANULAR</button>`;
-              acciones += ` <button class="btn btn-sm btn-danger" onclick="eliminarVenta('${docSnap.id}')">ELIMINAR</button>`;
+              acciones += ` <button class="btn btn-sm btn-warning" onclick="anularCierre('${docSnap.id}')">ANULAR</button>`;
+              acciones += ` <button class="btn btn-sm btn-danger" onclick="eliminarCierre('${docSnap.id}')">ELIMINAR</button>`;
             }
-            tablaVentas.row.add([
-              idVentaMostrar,
-              new Date(venta.fecha).toLocaleString(),
-              venta.cliente.nombre,
-              "Q" + Number(venta.total).toFixed(2),
-              venta.metodo_pago,
-              venta.estado ? venta.estado : "COMPLETADA",
+  
+            tablaCierres.row.add([
+              fechaHora,
+              cierre.usuario,
+              "Q " + Number(cierre.montoApertura || 0).toFixed(0),
+              "Q " + Number(cierre.totalEfectivo || 0).toFixed(2),
+              "Q " + Number(cierre.totalTarjeta || 0).toFixed(2),
+              "Q " + Number(cierre.totalGeneral || 0).toFixed(2),
+              "Q " + Number(cierre.totalEfectivoSistema || 0).toFixed(2),
+              "Q " + Number(cierre.totalIngresado || 0).toFixed(2),
+              "Q " + Number(cierre.diferencia || 0).toFixed(2),
               acciones
             ]);
           });
-          tablaVentas.draw();
-        });
+        }
+        tablaCierres.draw();
       }
   
-      // Función para ver el detalle de la venta y descargar el ticket en PDF, incluyendo detalle de productos vendidos
-      window.verDetalleVenta = async function (idVenta) {
+      // Función para ver el detalle del cierre, incluyendo ventas registradas con el nombre del empleado
+      window.verDetalleCierre = async function (cierreId) {
         try {
-          const ventaDoc = doc(db, "ventas", idVenta);
-          const docSnap = await getDoc(ventaDoc);
-          if (docSnap.exists()) {
-            let venta = docSnap.data();
-            venta.id = idVenta;
-            Swal.fire({
-              title: "Comprobante de Venta",
-              html: `
-                <div>
-                  <p><strong>ID:</strong> ${venta.idVenta ? Number(venta.idVenta) : venta.id}</p>
-                  <p><strong>Fecha:</strong> ${new Date(venta.fecha).toLocaleString()}</p>
-                  <p><strong>Cliente:</strong> ${venta.cliente.nombre}</p>
-                  <p><strong>Total:</strong> Q${Number(venta.total).toFixed(2)}</p>
-                  <p><strong>Método de Pago:</strong> ${venta.metodo_pago}</p>
-                  <p><strong>Estado:</strong> ${venta.estado ? venta.estado : "COMPLETADA"}</p>
-                  <button class='btn btn-sm btn-primary' onclick='descargarComprobante("${encodeURIComponent(JSON.stringify(venta))}")'>
-                    Descargar Ticket
-                  </button>
-                </div>
-              `,
-              showConfirmButton: true
-            });
+          const cierreDoc = await getDoc(doc(db, "cierres", cierreId));
+          if (!cierreDoc.exists()) {
+            Swal.fire("Error", "Cierre no encontrado.", "error");
+            return;
           }
+          const cierre = cierreDoc.data();
+          // Se asume que el campo "fechaCierre" es una cadena en formato "YYYY-MM-DD"
+          const start = new Date(cierre.fechaCierre);
+          const end = new Date(cierre.fechaCierre);
+          end.setDate(end.getDate() + 1);
+  
+          // Filtrar ventas cuyo campo "fecha" esté en el rango del día
+          const ventasQuery = query(
+            collection(db, "ventas"),
+            where("fecha", ">=", start.toISOString()),
+            where("fecha", "<", end.toISOString())
+          );
+          const ventasSnapshot = await getDocs(ventasQuery);
+          let ventasHTML = "";
+          if (ventasSnapshot.empty) {
+            ventasHTML = "<p>No se encontraron ventas para este día.</p>";
+          } else {
+            ventasHTML += `<table class="table table-bordered">
+              <thead>
+                <tr>
+                  <th>N° Documento</th>
+                  <th>Forma de Pago</th>
+                  <th>Monto (Q)</th>
+                  <th>Empleado</th>
+                </tr>
+              </thead>
+              <tbody>`;
+            ventasSnapshot.forEach((snap, index) => {
+              const venta = snap.data();
+              ventasHTML += `<tr>
+                <td>${venta.idVenta ? Number(venta.idVenta) : index + 1}</td>
+                <td>${venta.metodo_pago || "-"}</td>
+                <td>Q ${Number(venta.total || 0).toFixed(2)}</td>
+                <td>${venta.empleadoNombre || "N/A"}</td>
+              </tr>`;
+            });
+            ventasHTML += `</tbody></table>`;
+          }
+          let detalleHTML = `
+            <h4>Detalle del Cierre</h4>
+            <p><strong>Fecha y Hora:</strong> ${cierre.fechaCierre} ${cierre.horaCierre || ""}</p>
+            <p><strong>Cajero:</strong> ${cierre.usuario}</p>
+            <p><strong>Monto Apertura:</strong> Q ${Number(cierre.montoApertura || 0).toFixed(0)}</p>
+            <p><strong>Total Efectivo:</strong> Q ${Number(cierre.totalEfectivo || 0).toFixed(2)}</p>
+            <p><strong>Total Tarjeta:</strong> Q ${Number(cierre.totalTarjeta || 0).toFixed(2)}</p>
+            <p><strong>Venta Total:</strong> Q ${Number(cierre.totalGeneral || 0).toFixed(2)}</p>
+            <p><strong>Total Efectivo (Sistema):</strong> Q ${Number(cierre.totalEfectivoSistema || 0).toFixed(2)}</p>
+            <p><strong>Total Ingresado (Cajero):</strong> Q ${Number(cierre.totalIngresado || 0).toFixed(2)}</p>
+            <p><strong>Diferencia:</strong> <span class="${Number(cierre.diferencia || 0) < 0 ? 'text-rojo' : ''}">Q ${Number(cierre.diferencia || 0).toFixed(2)}</span></p>
+            <hr>
+            <h5>Ventas del Día</h5>
+            ${ventasHTML}
+          `;
+          Swal.fire({
+            title: "Detalle del Cierre",
+            html: detalleHTML,
+            width: "80%"
+          });
         } catch (error) {
-          Swal.fire("Error", error.toString(), "error");
+          console.error("Error al obtener detalle del cierre:", error);
+          Swal.fire("Error", "No se pudo cargar el detalle del cierre.", "error");
         }
       };
   
-      // Función para anular venta (solo admin)
-      window.anularVenta = function (idVenta) {
+      // Función para anular un cierre (solo admin)
+      window.anularCierre = async function (cierreId) {
         if (loggedUserRole !== "admin") {
-          Swal.fire("Acceso Denegado", "No tienes permiso para anular ventas.", "error");
+          Swal.fire("Acceso Denegado", "No tienes permiso para anular cierres.", "error");
           return;
         }
-        const ventaDoc = doc(db, "ventas", idVenta);
-        getDoc(ventaDoc).then((docSnap) => {
-          if (docSnap.exists()) {
-            let venta = docSnap.data();
-            if (venta.estado && venta.estado.toUpperCase() === "ANULADA") {
-              Swal.fire("LA VENTA YA ESTÁ ANULADA", "", "info");
-              return;
-            }
-            Swal.fire({
-              title: "¿ANULAR VENTA?",
-              text: "Esta acción marcará la venta como anulada.",
-              icon: "warning",
-              showCancelButton: true,
-              confirmButtonText: "SÍ, ANULAR"
-            }).then((result) => {
-              if (result.isConfirmed) {
-                updateDoc(ventaDoc, { estado: "ANULADA" }).then(() => {
-                  Swal.fire("VENTA ANULADA", "", "success");
-                });
-              }
-            });
+        try {
+          const cierreDoc = doc(db, "cierres", cierreId);
+          const cierreSnap = await getDoc(cierreDoc);
+          if (!cierreSnap.exists()) {
+            Swal.fire("Error", "Cierre no encontrado.", "error");
+            return;
           }
-        });
+          const cierre = cierreSnap.data();
+          if (cierre.estado && cierre.estado.toUpperCase() === "ANULADA") {
+            Swal.fire("El cierre ya está anulado.", "", "info");
+            return;
+          }
+          Swal.fire({
+            title: "¿ANULAR CIERRE?",
+            text: "Esta acción marcará el cierre como anulado.",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonText: "SÍ, ANULAR"
+          }).then(async (result) => {
+            if (result.isConfirmed) {
+              await updateDoc(cierreDoc, { estado: "ANULADA" });
+              Swal.fire("Cierre Anulado", "", "success");
+            }
+          });
+        } catch (error) {
+          console.error("Error al anular cierre:", error);
+          Swal.fire("Error", "No se pudo anular el cierre.", "error");
+        }
       };
   
-      // Función para eliminar venta (solo admin)
-      window.eliminarVenta = function (idVenta) {
+      // Función para eliminar un cierre (solo admin)
+      window.eliminarCierre = async function (cierreId) {
         if (loggedUserRole !== "admin") {
-          Swal.fire("Acceso Denegado", "No tienes permiso para eliminar ventas.", "error");
+          Swal.fire("Acceso Denegado", "No tienes permiso para eliminar cierres.", "error");
           return;
         }
         Swal.fire({
-          title: "¿ELIMINAR VENTA?",
-          text: "Esta acción eliminará la venta permanentemente.",
+          title: "¿ELIMINAR CIERRE?",
+          text: "Esta acción eliminará el cierre permanentemente.",
           icon: "error",
           showCancelButton: true,
           confirmButtonText: "SÍ, ELIMINAR"
-        }).then((result) => {
+        }).then(async (result) => {
           if (result.isConfirmed) {
-            deleteDoc(doc(db, "ventas", idVenta))
-              .then(() => {
-                Swal.fire("VENTA ELIMINADA", "", "success");
-              })
-              .catch((error) => {
-                Swal.fire("ERROR", error.toString(), "error");
-              });
+            try {
+              await deleteDoc(doc(db, "cierres", cierreId));
+              Swal.fire("Cierre Eliminado", "", "success");
+            } catch (error) {
+              Swal.fire("Error", error.toString(), "error");
+            }
           }
         });
       };
   
-      // Función para descargar y visualizar el ticket de venta en PDF con detalle de productos vendidos
-      window.descargarComprobante = function (ventaEncoded) {
-        const venta = JSON.parse(decodeURIComponent(ventaEncoded));
+      // Función para descargar el reporte PDF del cierre, incluyendo el detalle de las ventas con el empleado
+      window.descargarReporteCierre = function (cierre, ventasHTML) {
         const { jsPDF } = window.jspdf;
-        // Crear un PDF tipo ticket (formato reducido: 80 x 300 mm)
-        const doc = new jsPDF({
-          orientation: "p",
-          unit: "mm",
-          format: [80, 300]
-        });
-        let y = 5;
-        const lineHeight = 5;
-        // Encabezado del ticket
-        doc.setFont("Helvetica", "bold");
-        doc.setFontSize(12);
-        doc.text("TICKET DE VENTA", 40, y, { align: "center" });
-        y += lineHeight * 2;
-        // Datos básicos de la venta
-        doc.setFont("Helvetica", "normal");
+        const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+        let y = 10;
+        doc.setFontSize(14);
+        doc.text(`Reporte de Cierre - ${cierre.fechaCierre}`, 10, y);
+        y += 10;
         doc.setFontSize(10);
-        doc.text(`ID: ${venta.idVenta ? Number(venta.idVenta) : venta.id}`, 5, y);
-        y += lineHeight;
-        doc.text(`Fecha: ${new Date(venta.fecha).toLocaleString()}`, 5, y);
-        y += lineHeight;
-        doc.text(`Cliente: ${venta.cliente.nombre}`, 5, y);
-        y += lineHeight;
-        doc.text(`Total: Q${Number(venta.total).toFixed(2)}`, 5, y);
-        y += lineHeight;
-        doc.text(`Pago: ${venta.metodo_pago}`, 5, y);
-        y += lineHeight * 2;
-        // Incluir detalle de productos vendidos
-        doc.setFont("Helvetica", "bold");
-        doc.setFontSize(10);
-        doc.text("PRODUCTOS:", 5, y);
-        y += lineHeight;
-        doc.setFont("Helvetica", "normal");
-        venta.productos.forEach((prod, index) => {
-          if (y > 280) {
-            doc.addPage();
-            y = 5;
-          }
-          doc.text(`${index + 1}. ${prod.producto_nombre}`, 5, y);
-          y += lineHeight;
-          doc.text(`Cant: ${prod.cantidad} x Q${Number(prod.precio_unitario || 0).toFixed(2)} = Q${Number(prod.subtotal || 0).toFixed(2)}`, 5, y);
-          y += lineHeight;
-        });
-        y += lineHeight;
-        doc.setFont("Helvetica", "bold");
-        doc.text("¡GRACIAS POR SU COMPRA!", 40, y, { align: "center" });
-        doc.output("dataurlnewwindow");
-        doc.save("ticket.pdf");
+        doc.text(`Hora: ${cierre.horaCierre || ""}`, 10, y);
+        y += 7;
+        doc.text(`Cajero: ${cierre.usuario}`, 10, y);
+        y += 7;
+        doc.text(`Fondo Apertura: Q ${Number(cierre.montoApertura || 0).toFixed(0)}`, 10, y);
+        y += 7;
+        doc.text(`Total Efectivo: Q ${Number(cierre.totalEfectivo || 0).toFixed(2)}`, 10, y);
+        y += 7;
+        doc.text(`Total Tarjeta: Q ${Number(cierre.totalTarjeta || 0).toFixed(2)}`, 10, y);
+        y += 7;
+        doc.text(`Venta Total: Q ${Number(cierre.totalGeneral || 0).toFixed(2)}`, 10, y);
+        y += 7;
+        doc.text(`Total Efectivo (Sistema): Q ${Number(cierre.totalEfectivoSistema || 0).toFixed(2)}`, 10, y);
+        y += 7;
+        doc.text(`Total Ingresado (Cajero): Q ${Number(cierre.totalIngresado || 0).toFixed(2)}`, 10, y);
+        y += 7;
+        doc.text(`Diferencia: Q ${Number(cierre.diferencia || 0).toFixed(2)}`, 10, y);
+        y += 10;
+        doc.text("Ventas del Día:", 10, y);
+        y += 7;
+        // Aquí se podrían agregar más detalles si es necesario
+        doc.save(`Reporte_Cierre_${cierre.fechaCierre}.pdf`);
       };
+  
+      cargarCierres();
     </script>
   </body>
 </html>
