@@ -13,10 +13,11 @@ import {
   addDoc,
   updateDoc,
   writeBatch,
-  onSnapshot
+  onSnapshot,
+  limit
 } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
-// Verificar Login
+/************ Verificar Login ************/
 document.addEventListener("DOMContentLoaded", () => {
   const loggedUser = localStorage.getItem("loggedUser");
   if (!loggedUser) {
@@ -24,7 +25,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// Variables Globales
+/************ Variables Globales ************/
 let productos = [];
 let cart = [];
 let datosCliente = {};
@@ -32,7 +33,7 @@ let datosCliente = {};
 // Variables para control de caja
 let cajaAbierta = false;
 let idAperturaActivo = null;
-let montoApertura = 0;
+let montoApertura = 0; // Monto de apertura en número entero
 let datosApertura = {};
 
 // Gestión de usuario y tienda
@@ -43,7 +44,9 @@ const isAdmin = (loggedUserRole.toLowerCase() === "admin");
 let currentStore = "";
 const usuarioActual = loggedUser;
 
-// Generar IDs Cortos (para ventas, aperturas, etc.)
+/*******************************************************
+ * Generar IDs Cortos (para ventas, aperturas, etc.)
+ *******************************************************/
 function generarIdCorto() {
   return Math.floor(Math.random() * 90000) + 10000;
 }
@@ -51,7 +54,53 @@ function generarIdVentaCorta() {
   return Math.floor(Math.random() * 9000) + 1000;
 }
 
-// Verificar si hay una caja abierta en la base de datos
+/*******************************************************
+ * Obtener el próximo número de apertura de forma incremental
+ *******************************************************/
+async function getNextAperturaId() {
+  try {
+    const aperturasRef = collection(db, "aperturas");
+    const q = query(aperturasRef, orderBy("idApertura", "desc"), limit(1));
+    const snapshot = await getDocs(q);
+    let nextId = 1;
+    if (!snapshot.empty) {
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data();
+        nextId = parseInt(data.idApertura) + 1;
+      });
+    }
+    return nextId;
+  } catch (error) {
+    console.error("Error al obtener el próximo número de apertura:", error);
+    return generarIdCorto();
+  }
+}
+
+/*******************************************************
+ * Función para obtener el nombre del empleado según su código
+ *******************************************************/
+async function getEmployeeName(codigo) {
+  try {
+    const empleadosRef = collection(db, "empleados");
+    const q = query(empleadosRef, where("codigo", "==", codigo.toUpperCase()));
+    const snapshot = await getDocs(q);
+    let empName = "";
+    if (!snapshot.empty) {
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        empName = data.nombre;
+      });
+    }
+    return empName || codigo;
+  } catch (error) {
+    console.error("Error al obtener nombre de empleado:", error);
+    return codigo;
+  }
+}
+
+/*******************************************************
+ * Verificar si hay una caja abierta en la base de datos
+ *******************************************************/
 async function checkCajaAbierta() {
   try {
     const aperturasRef = collection(db, "aperturas");
@@ -74,7 +123,9 @@ async function checkCajaAbierta() {
   }
 }
 
-// Configuración de la Interfaz al Cargar el DOM
+/*******************************************************
+ * Configuración de la Interfaz al Cargar el DOM
+ *******************************************************/
 document.addEventListener("DOMContentLoaded", async () => {
   await checkCajaAbierta();
 
@@ -97,7 +148,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("sizeFilter").addEventListener("change", renderProducts);
 });
 
-// Cargar Tiendas (para admin)
+/*******************************************************
+ * Cargar Tiendas (para admin)
+ *******************************************************/
 async function loadStoreFilter() {
   try {
     const qStores = query(collection(db, "tiendas"), orderBy("nombre"));
@@ -116,7 +169,9 @@ async function loadStoreFilter() {
   }
 }
 
-// Escuchar la colección "productos" en tiempo real
+/*******************************************************
+ * Escuchar la colección "productos" en tiempo real
+ *******************************************************/
 function listenProducts() {
   const qProducts = query(collection(db, "productos"), orderBy("createdAt", "desc"));
   onSnapshot(
@@ -137,7 +192,9 @@ function listenProducts() {
   );
 }
 
-// Renderizar Productos (filtrado por búsqueda, talla y tienda)
+/*******************************************************
+ * Renderizar Productos (filtrado por búsqueda, talla y tienda)
+ *******************************************************/
 function renderProducts() {
   const searchQuery = (document.getElementById("searchInput")?.value || "").toLowerCase();
   const sizeFilter = (document.getElementById("sizeFilter")?.value || "").toLowerCase();
@@ -174,7 +231,7 @@ function renderProducts() {
       <td>${prod.codigo}</td>
       <td>${prod.descripcion}</td>
       <td>${prod.talla || ""}</td>
-      <td>Q ${parseFloat(prod.precio).toFixed(2)}</td>
+      <td>Q ${parseFloat(prod.precio || 0).toFixed(2)}</td>
       <td>${stockDisplay}</td>
       <td><button class="btn btn-primary btn-sm">Agregar</button></td>
     `;
@@ -193,7 +250,9 @@ function renderProducts() {
   });
 }
 
-// Agregar Producto al Carrito
+/*******************************************************
+ * Agregar Producto al Carrito
+ *******************************************************/
 async function agregarProductoAlCarrito(productId) {
   const prod = productos.find(p => p.id === productId);
   if (!prod) return;
@@ -241,7 +300,9 @@ async function agregarProductoAlCarrito(productId) {
   }
 }
 
-// Renderizar Carrito
+/*******************************************************
+ * Renderizar Carrito
+ *******************************************************/
 function renderCart() {
   const tbody = document.querySelector("#cartTable tbody");
   tbody.innerHTML = "";
@@ -267,12 +328,10 @@ function renderCart() {
 }
 
 /*******************************************************
- * Procesar Venta (Caja debe estar abierta)
- * Antes de procesar la venta, se solicita:
- * 1. El tipo de venta: Física o en Línea.
- * 2. El código del empleado (3 caracteres).
- * Para venta física se solicitan datos del cliente, método de pago y, en caso de transferencia, número de transferencia.
- * Para venta en línea se solicitan datos del cliente, comprobante de pago y comentario.
+ * Procesar Venta
+ * - Se solicita primero el tipo de venta (Física o en Línea).
+ * - Luego se solicita el código del empleado (3 caracteres) para registrar quién realizó la venta.
+ * - Dependiendo del tipo, se solicitan datos adicionales.
  *******************************************************/
 async function procesarVenta() {
   if (!cajaAbierta || !idAperturaActivo) {
@@ -316,6 +375,9 @@ async function procesarVenta() {
   });
   if (!empCodigo) return;
   
+  // Obtener el nombre del empleado según el código
+  const empNombre = await getEmployeeName(empCodigo);
+  
   let totalVenta = parseFloat(document.getElementById("totalVenta").textContent) || 0;
   let resumenHtml = "";
   cart.forEach(item => {
@@ -325,12 +387,11 @@ async function procesarVenta() {
          Cant: ${item.cantidad} x Q${item.precio.toFixed(2)} = Q${subt.toFixed(2)}</p>
     `;
   });
-  resumenHtml += `<h4>Total: Q${totalVenta.toFixed(2)}</h4>`;
+  resumenHtml += `<h4>Venta Total: Q${totalVenta.toFixed(2)}</h4>`;
   
   let formData;
-  
   if (saleCategory === "fisico") {
-    // Para venta física se solicita método de pago y datos del cliente
+    // Venta física: solicitar datos del cliente y método de pago
     const result = await Swal.fire({
       title: "Procesar Venta - Física",
       html: `
@@ -375,8 +436,8 @@ async function procesarVenta() {
         let metodo = document.getElementById("metodoPago").value;
         let pagoObj = { metodo };
         if (metodo === "Efectivo") {
-          let montoRecibido = parseFloat(document.getElementById("montoRecibido").value);
-          if (isNaN(montoRecibido) || montoRecibido < totalVenta) {
+          let montoRecibido = parseFloat(document.getElementById("montoRecibido").value) || 0;
+          if (montoRecibido < totalVenta) {
             Swal.showValidationMessage("Monto insuficiente para cubrir el total");
             return;
           }
@@ -413,7 +474,7 @@ async function procesarVenta() {
     });
     formData = result.value;
   } else {
-    // Para venta en línea se solicita datos del cliente, comprobante de pago y comentario
+    // Venta en línea: solicitar datos del cliente, comprobante de pago y comentario
     const result = await Swal.fire({
       title: "Procesar Venta - En Línea",
       html: `
@@ -451,7 +512,11 @@ async function procesarVenta() {
           correo: document.getElementById("clienteCorreo").value.trim(),
           direccion: document.getElementById("clienteDireccion").value.trim()
         };
-        let pagoObj = { metodo: "En Línea", comprobante, comentario: document.getElementById("comentarioVenta").value.trim() };
+        let pagoObj = {
+          metodo: "En Línea",
+          comprobante,
+          comentario: document.getElementById("comentarioVenta").value.trim()
+        };
         return { clienteData, pagoObj };
       }
     });
@@ -459,6 +524,7 @@ async function procesarVenta() {
   }
   if (!formData) return;
   
+  // Construir la venta, incluyendo el nombre del empleado
   let ventaId = generarIdVentaCorta();
   let venta = {
     idVenta: ventaId,
@@ -477,9 +543,10 @@ async function procesarVenta() {
     cambio: formData.pagoObj.cambio || 0,
     usuario: usuarioActual,
     idApertura: idAperturaActivo,
-    // Registrar el código del empleado en mayúsculas
-    empleadoCodigo: empCodigo.toUpperCase()
+    empleadoNombre: empNombre
   };
+  
+  // Actualizar el stock de los productos mediante un batch
   const batch = writeBatch(db);
   for (let item of cart) {
     let prodRef = doc(db, "productos", item.productId);
@@ -543,6 +610,8 @@ function descargarComprobante(venta) {
   doc.text(`Fecha: ${new Date(venta.fecha).toLocaleString()}`, 10, y);
   y += lineHeight;
   doc.text(`Cajero: ${venta.usuario}`, 10, y);
+  y += lineHeight;
+  doc.text(`Empleado: ${venta.empleadoNombre}`, 10, y);
   
   // Datos del Cliente
   y += lineHeight * 1.5;
@@ -562,11 +631,6 @@ function descargarComprobante(venta) {
     doc.text(`Dirección: ${venta.cliente.direccion}`, 10, y);
   }
   
-  // Mostrar el código del empleado
-  y += lineHeight * 1.5;
-  doc.setFontSize(14);
-  doc.text(`Empleado: ${venta.empleadoCodigo}`, 10, y);
-  
   // Detalle de la Venta
   y += lineHeight * 1.5;
   doc.setFontSize(14);
@@ -580,16 +644,30 @@ function descargarComprobante(venta) {
     }
     doc.text(`${index + 1}. ${prod.producto_nombre} (${prod.producto_codigo})`, 10, y);
     y += lineHeight;
-    doc.text(`   Cant: ${prod.cantidad} x Q${parseFloat(prod.precio_unitario).toFixed(2)} = Q${parseFloat(prod.subtotal).toFixed(2)}`, 10, y);
+    doc.text(`   Cant: ${prod.cantidad} x Q${parseFloat(prod.precio_unitario || 0).toFixed(2)} = Q${parseFloat(prod.subtotal || 0).toFixed(2)}`, 10, y);
     y += lineHeight;
   });
+  
+  // Sumarios
+  const fondoApertura = Number(datosApertura.montoApertura || 0);
+  const ventaEfectivo = venta.metodo_pago.toLowerCase() === "efectivo" ? Number(venta.total || 0) : 0;
+  const totalEfectivoSistema = fondoApertura + ventaEfectivo;
+  const totalIngresado = venta.metodo_pago.toLowerCase() === "efectivo" ? Number(venta.total || 0) : Number(venta.total || 0);
+  const diferencia = totalEfectivoSistema - totalIngresado;
+  
+  y += lineHeight * 1.5;
+  doc.text(`VENTA TOTAL: Q${Number(venta.total || 0).toFixed(2)}`, 10, y);
   y += lineHeight;
-  doc.text(`Total: Q${parseFloat(venta.total).toFixed(2)}`, 10, y);
+  doc.text(`TOTAL EFECTIVO (Sistema): Q${totalEfectivoSistema.toFixed(2)}`, 10, y);
+  y += lineHeight;
+  doc.text(`TOTAL INGRESADO (Cajero): Q${totalIngresado.toFixed(2)}`, 10, y);
+  y += lineHeight;
+  doc.text(`DIFERENCIA: Q${diferencia.toFixed(2)}`, 10, y);
   y += lineHeight;
   doc.text(`Método de Pago: ${venta.metodo_pago}`, 10, y);
   if (venta.metodo_pago.toLowerCase() === "efectivo") {
     y += lineHeight;
-    doc.text(`Cambio: Q${parseFloat(venta.cambio).toFixed(2)}`, 10, y);
+    doc.text(`Cambio: Q${Number(venta.cambio || 0).toFixed(2)}`, 10, y);
   }
   
   doc.output("dataurlnewwindow");
@@ -603,6 +681,8 @@ async function abrirCaja() {
     Swal.fire("Error", "La caja ya está abierta.", "warning");
     return;
   }
+  // Obtener el número de apertura incremental
+  const nextAperturaId = await getNextAperturaId();
   const { value: monto } = await Swal.fire({
     title: "Abrir Caja",
     input: "number",
@@ -614,16 +694,17 @@ async function abrirCaja() {
     }
   });
   if (!monto) return;
-  montoApertura = parseFloat(monto);
+  // Convertir el monto a entero
+  montoApertura = parseInt(monto);
   let now = new Date();
   let fecha = now.toISOString().split("T")[0];
   let hora = now.toTimeString().split(" ")[0];
-  let idApertura = generarIdCorto();
+  let idApertura = nextAperturaId; // Número incremental
   let apertura = {
-    idApertura,
+    idApertura, // Valor entero
     fechaApertura: fecha,
     horaApertura: hora,
-    montoApertura,
+    montoApertura, // Se almacena el monto de apertura
     usuario: usuarioActual,
     activo: true
   };
@@ -631,8 +712,8 @@ async function abrirCaja() {
     const docRef = await addDoc(collection(db, "aperturas"), apertura);
     cajaAbierta = true;
     idAperturaActivo = docRef.id;
-    datosApertura = apertura;
-    Swal.fire("Caja Abierta", `Apertura registrada. Monto: Q${montoApertura.toFixed(2)}`, "success");
+    datosApertura = apertura; // Asegurarse de guardar el monto de apertura
+    Swal.fire("Caja Abierta", `Apertura registrada. Fondo: Q${montoApertura.toFixed(2)} (N° Apertura: ${idApertura})`, "success");
   } catch (error) {
     Swal.fire("Error", error.message, "error");
   }
@@ -651,7 +732,7 @@ async function cerrarCaja() {
       <input type="number" id="montoFinal" class="swal2-input" placeholder="Monto final en caja (Q)">
     `,
     preConfirm: () => {
-      const mf = parseFloat(document.getElementById("montoFinal").value);
+      const mf = parseInt(document.getElementById("montoFinal").value);
       if (isNaN(mf)) {
         Swal.showValidationMessage("Monto final inválido");
       }
@@ -659,7 +740,7 @@ async function cerrarCaja() {
     }
   });
   if (formCierre === undefined) return;
-  let montoFinal = parseFloat(formCierre) || 0;
+  let montoFinal = parseInt(formCierre) || 0;
   let qVentas = query(collection(db, "ventas"), where("idApertura", "==", idAperturaActivo));
   try {
     const snap = await getDocs(qVentas);
@@ -670,16 +751,20 @@ async function cerrarCaja() {
     snap.forEach(docSnap => {
       let venta = docSnap.data();
       if (venta.metodo_pago?.toLowerCase() === "efectivo") {
-        totalEfectivo += venta.total;
+        totalEfectivo += Number(venta.total || 0);
       } else if (venta.metodo_pago?.toLowerCase() === "tarjeta") {
-        totalTarjeta += venta.total;
+        totalTarjeta += Number(venta.total || 0);
       } else if (venta.metodo_pago?.toLowerCase() === "transferencia") {
-        totalTransferencia += venta.total;
+        totalTransferencia += Number(venta.total || 0);
       }
       ventasDetalle.push(venta);
     });
     let totalGeneral = totalEfectivo + totalTarjeta + totalTransferencia;
-    let diferencia = montoFinal - totalGeneral;
+    // TOTAL EFECTIVO (Sistema): Fondo Apertura + Ventas en Efectivo
+    const totalEfectivoSistema = (montoApertura || 0) + totalEfectivo;
+    // TOTAL INGRESADO (Cajero) se toma del monto final ingresado
+    const totalIngresado = montoFinal;
+    const diferencia = totalEfectivoSistema - totalIngresado;
     let now = new Date();
     let horaCierre = now.toTimeString().split(" ")[0];
     let cierreData = {
@@ -688,12 +773,13 @@ async function cerrarCaja() {
       horaApertura: datosApertura.horaApertura,
       fechaCierre: fechaHoy,
       horaCierre,
+      montoApertura: datosApertura.montoApertura, // Incluir el fondo de apertura
       totalEfectivo,
       totalTarjeta,
       totalTransferencia,
       totalGeneral,
-      montoApertura,
-      montoFinal,
+      totalEfectivoSistema,
+      totalIngresado,
       diferencia,
       usuario: usuarioActual
     };
@@ -719,7 +805,7 @@ function generarReporteCierreHTML(ventas, cierre) {
           <strong>Num. Apertura:</strong> ${cierre.idApertura}
         </div>
         <div class="col-md-3 summary-box">
-          <strong>Nombre Cajero:</strong> ${cierre.usuario}
+          <strong>Cajero:</strong> ${cierre.usuario}
         </div>
         <div class="col-md-3 summary-box">
           <strong>Fecha Apertura:</strong> ${cierre.fechaApertura} ${cierre.horaApertura}
@@ -730,34 +816,26 @@ function generarReporteCierreHTML(ventas, cierre) {
       </div>
       <div class="row mb-3">
         <div class="col-md-4 summary-box bg-light">
-          <strong>Fondo Apertura:</strong> Q ${cierre.montoApertura.toFixed(2)}
+          <strong>Fondo Apertura:</strong> Q ${Number(cierre.montoApertura || 0).toFixed(2)}
         </div>
         <div class="col-md-4 summary-box bg-light">
-          <strong>Venta Total:</strong> Q ${cierre.totalGeneral.toFixed(2)}
+          <strong>Venta Efectivo:</strong> Q ${Number(cierre.totalEfectivo || 0).toFixed(2)}
         </div>
         <div class="col-md-4 summary-box bg-light">
-          <strong>Venta Efectivo:</strong> Q ${cierre.totalEfectivo.toFixed(2)}
+          <strong>VENTA TOTAL:</strong> Q ${Number(cierre.totalGeneral || 0).toFixed(2)}
         </div>
       </div>
       <div class="row mb-3">
         <div class="col-md-6 summary-box bg-light">
-          <strong>Venta Tarjeta:</strong> Q ${cierre.totalTarjeta.toFixed(2)}
+          <strong>TOTAL EFECTIVO (Sistema):</strong> Q ${Number(cierre.totalEfectivoSistema || 0).toFixed(2)}
         </div>
         <div class="col-md-6 summary-box bg-light">
-          <strong>Venta Transferencia:</strong> Q ${cierre.totalTransferencia.toFixed(2)}
-        </div>
-      </div>
-      <div class="row mb-3">
-        <div class="col-md-6 summary-box bg-light">
-          <strong>Total Sistema:</strong> Q ${cierre.totalGeneral.toFixed(2)}
-        </div>
-        <div class="col-md-6 summary-box bg-light">
-          <strong>Total Cajero:</strong> Q ${cierre.montoFinal.toFixed(2)}
+          <strong>TOTAL INGRESADO (Cajero):</strong> Q ${Number(cierre.totalIngresado || 0).toFixed(2)}
         </div>
       </div>
       <div class="row mb-3">
         <div class="col-md-12 summary-box bg-light">
-          <strong>Diferencia de Caja:</strong> Q ${cierre.diferencia.toFixed(2)}
+          <strong>DIFERENCIA:</strong> Q ${Number(cierre.diferencia || 0).toFixed(2)}
         </div>
       </div>
       <h4>Detalles de Operaciones</h4>
@@ -767,45 +845,24 @@ function generarReporteCierreHTML(ventas, cierre) {
             <th>N° Documento</th>
             <th>Forma de Pago</th>
             <th>Monto Pagado</th>
-            <th>Equivalencia en Caja</th>
+            <th>Empleado</th>
           </tr>
         </thead>
         <tbody>`;
-  ventas.forEach(v => {
-    let equivalencia = (v.metodo_pago?.toLowerCase() === "efectivo")
-      ? `Q ${parseFloat(v.total).toFixed(2)}`
-      : "-";
+  ventas.forEach((v, index) => {
     htmlReporte += `
           <tr>
-            <td>${v.id}</td>
-            <td>${v.metodo_pago}</td>
-            <td>Q ${parseFloat(v.total).toFixed(2)}</td>
-            <td>${equivalencia}</td>
+            <td>${v.idVenta || index + 1}</td>
+            <td>${v.metodo_pago || "-"}</td>
+            <td>Q ${Number(v.total || 0).toFixed(2)}</td>
+            <td>${v.empleadoNombre || "-"}</td>
           </tr>`;
   });
   htmlReporte += `
         </tbody>
       </table>
-      <br>
-      <button class="btn btn-primary" onclick="descargarReporteCierre(
-        ${encodeURIComponent(JSON.stringify(ventas))},
-        ${encodeURIComponent(JSON.stringify(cierre))}
-      )">Descargar Reporte PDF</button>
     </div>`;
   return htmlReporte;
-}
-
-function descargarReporteCierre(ventasJSON, cierreJSON) {
-  const ventas = JSON.parse(decodeURIComponent(ventasJSON));
-  const cierre = JSON.parse(decodeURIComponent(cierreJSON));
-  Swal.fire("PDF", "Reporte de Cierre en PDF por implementar", "info");
-}
-
-/*******************************************************
- * Inicialización del Sistema de Ventas
- *******************************************************/
-async function initSistemaVenta() {
-  await loadProductos();
 }
 
 /*******************************************************
@@ -830,9 +887,19 @@ async function loadProductos() {
 }
 
 /*******************************************************
+ * Inicialización del Sistema de Ventas
+ *******************************************************/
+async function initSistemaVenta() {
+  await loadProductos();
+}
+
+/*******************************************************
  * Exponer funciones globalmente para ser usadas en HTML
  *******************************************************/
 window.abrirCaja = abrirCaja;
 window.procesarVenta = procesarVenta;
 window.cerrarCaja = cerrarCaja;
 window.descargarComprobante = descargarComprobante;
+
+// Iniciar el sistema
+initSistemaVenta();

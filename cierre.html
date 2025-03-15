@@ -1,295 +1,295 @@
 <!DOCTYPE html>
 <html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Historial de Cierres de Caja</title>
-  <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- DataTables CSS -->
-  <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css">
-  <!-- SweetAlert2 -->
-  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-  <!-- jQuery (requerido por DataTables) -->
-  <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-  <!-- DataTables JS -->
-  <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
-  <!-- jsPDF para generar PDF -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-  <style>
-    body {
-      padding: 20px;
-    }
-    .table-responsive {
-      margin-top: 20px;
-    }
-    .text-rojo {
-      color: red;
-    }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <h1 class="mb-4">Historial de Cierres de Caja</h1>
-    <!-- Filtro por fecha -->
-    <div class="row mb-3">
-      <div class="col-md-4">
-        <label for="filtroFecha" class="form-label">Filtrar por fecha:</label>
-        <input type="date" id="filtroFecha" class="form-control">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Historial de Ventas</title>
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- DataTables CSS -->
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css"
+    />
+    <!-- SweetAlert2 -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- jQuery (requerido por DataTables) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.4/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.4/js/dataTables.bootstrap5.min.js"></script>
+    <!-- jsPDF para generar PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <style>
+      body {
+        padding: 20px;
+      }
+      .table-responsive {
+        margin-top: 20px;
+      }
+      .text-rojo {
+        color: red;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1 class="mb-4">Historial de Ventas</h1>
+      <!-- Filtro por fecha -->
+      <div class="row mb-3">
+        <div class="col-md-4">
+          <label for="filtroFecha" class="form-label">Filtrar por fecha:</label>
+          <input type="date" id="filtroFecha" class="form-control" />
+        </div>
+      </div>
+      <!-- Tabla de ventas -->
+      <div class="table-responsive">
+        <table id="ventasTable" class="table table-striped table-bordered">
+          <thead>
+            <tr>
+              <th>ID VENTA</th>
+              <th>FECHA</th>
+              <th>CLIENTE</th>
+              <th>MONTO TOTAL</th>
+              <th>MÉTODO DE PAGO</th>
+              <th>ESTADO</th>
+              <th>ACCIONES</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Se cargarán dinámicamente desde Firestore -->
+          </tbody>
+        </table>
       </div>
     </div>
-    <!-- Tabla de cierres -->
-    <div class="table-responsive">
-      <table class="table table-striped" id="tablaCierres">
-        <thead>
-          <tr>
-            <th>Fecha y Hora</th>
-            <th>Usuario</th>
-            <th>Total Efectivo</th>
-            <th>Total Tarjeta</th>
-            <th>Monto Final</th>
-            <th>Diferencia</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Se llenará dinámicamente -->
-        </tbody>
-      </table>
-    </div>
-    <p id="mensajeSinCierres" class="text-center text-muted" style="display: none;">No hay cierres disponibles.</p>
-  </div>
-
-  <!-- Bootstrap Bundle JS -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   
-  <!-- Script principal (Firebase v9 modular) -->
-  <script type="module">
-    // Importamos la configuración desde firebase-config.js
-    import { db } from "./firebase-config.js";
-    import {
-      collection,
-      query,
-      orderBy,
-      getDocs,
-      onSnapshot,
-      where,
-      doc,
-      updateDoc,
-      deleteDoc,
-      getDoc
-    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-
-    // Obtenemos el rol del usuario (se espera que esté almacenado en localStorage)
-    const loggedUserRole = (localStorage.getItem("loggedUserRole") || "").toLowerCase();
-
-    let tablaCierres;
-    $(document).ready(function () {
-      tablaCierres = $("#tablaCierres").DataTable({
-        language: { url: "https://cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json" },
-        columns: [
-          { title: "Fecha y Hora" },
-          { title: "Usuario" },
-          { title: "Total Efectivo" },
-          { title: "Total Tarjeta" },
-          { title: "Monto Final" },
-          { title: "Diferencia" },
-          { title: "Acciones", orderable: false }
-        ],
-        order: [[0, "desc"]],
-        responsive: true
-      });
-      cargarCierres();
-      $("#filtroFecha").on("change", cargarCierres);
-    });
-
-    // Función para cargar cierres desde Firestore
-    async function cargarCierres() {
-      const filtroFecha = document.getElementById("filtroFecha").value;
-      let cierresQuery = query(collection(db, "cierres"), orderBy("fechaCierre", "desc"));
-      if (filtroFecha) {
-        cierresQuery = query(collection(db, "cierres"), where("fechaCierre", "==", filtroFecha), orderBy("fechaCierre", "desc"));
-      }
-      const snapshot = await getDocs(cierresQuery);
-      tablaCierres.clear();
-      if (snapshot.empty) {
-        document.getElementById("mensajeSinCierres").style.display = "block";
-      } else {
-        document.getElementById("mensajeSinCierres").style.display = "none";
-        snapshot.forEach(docSnap => {
-          const cierre = docSnap.data();
-          cierre.id = docSnap.id;
-          const fechaHora = cierre.fechaCierre + " " + (cierre.horaCierre || "");
-          let acciones = `<button class="btn btn-sm btn-info" onclick="verDetalleCierre('${docSnap.id}')">VER</button>`;
-          // Sólo el admin puede anular o eliminar cierres
-          if (loggedUserRole === "admin") {
-            acciones += ` <button class="btn btn-sm btn-warning" onclick="anularCierre('${docSnap.id}')">ANULAR</button>`;
-            acciones += ` <button class="btn btn-sm btn-danger" onclick="eliminarCierre('${docSnap.id}')">ELIMINAR</button>`;
-          }
-          tablaCierres.row.add([
-            fechaHora,
-            cierre.usuario,
-            "Q " + parseFloat(cierre.totalEfectivo).toFixed(2),
-            "Q " + parseFloat(cierre.totalTarjeta).toFixed(2),
-            "Q " + parseFloat(cierre.montoFinal).toFixed(2),
-            "Q " + parseFloat(cierre.diferencia).toFixed(2),
-            acciones
-          ]);
+    <!-- Bootstrap JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script type="module">
+      // Importar Firebase v9 modular
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        query,
+        orderBy,
+        getDocs,
+        onSnapshot,
+        where,
+        doc,
+        updateDoc,
+        deleteDoc,
+        getDoc
+      } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+  
+      // Configuración de Firebase (ajusta según tu proyecto)
+      const firebaseConfig = {
+        apiKey: "AIzaSyBoBj8-oqIwAOJG7aplYPWt7q4J3wigbmc",
+        authDomain: "gleedb-d9478.firebaseapp.com",
+        projectId: "gleedb-d9478",
+        storageBucket: "gleedb-d9478.firebasestorage.app",
+        messagingSenderId: "722495997438",
+        appId: "1:722495997438:web:19fd9152263a4651feacaf"
+      };
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+  
+      // Variables globales y rol del usuario
+      let tablaVentas;
+      const loggedUserRole = (localStorage.getItem("loggedUserRole") || "").toLowerCase();
+      const loggedUser = localStorage.getItem("loggedUser") || "";
+  
+      $(document).ready(function () {
+        tablaVentas = $("#ventasTable").DataTable({
+          language: { url: "https://cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json" },
+          columns: [
+            { title: "ID VENTA" },
+            { title: "FECHA" },
+            { title: "CLIENTE" },
+            { title: "MONTO TOTAL" },
+            { title: "MÉTODO DE PAGO" },
+            { title: "ESTADO" },
+            { title: "ACCIONES", orderable: false }
+          ],
+          order: [[1, "desc"]],
+          responsive: true
         });
-      }
-      tablaCierres.draw();
-    }
-
-    // Función para ver el detalle del cierre
-    window.verDetalleCierre = async function (cierreId) {
-      try {
-        const cierreDoc = await getDoc(doc(db, "cierres", cierreId));
-        if (!cierreDoc.exists()) {
-          Swal.fire("Error", "Cierre no encontrado.", "error");
-          return;
-        }
-        const cierre = cierreDoc.data();
-        const fecha = cierre.fechaCierre;
-        let ventasQuery = query(collection(db, "ventas"), where("fecha", ">=", fecha), where("fecha", "<", fecha));
-        const ventasSnapshot = await getDocs(ventasQuery);
-        let ventasHTML = "";
-        if (ventasSnapshot.empty) {
-          ventasHTML = "<p>No se encontraron ventas para este día.</p>";
-        } else {
-          ventasHTML += `<table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>ID Venta</th>
-                <th>Método de Pago</th>
-                <th>Monto (Q)</th>
-              </tr>
-            </thead>
-            <tbody>`;
-          ventasSnapshot.forEach(snap => {
-            const venta = snap.data();
-            ventasHTML += `<tr>
-              <td>${snap.id}</td>
-              <td>${venta.metodo_pago}</td>
-              <td>Q ${parseFloat(venta.total).toFixed(2)}</td>
-            </tr>`;
+        cargarVentas();
+        $("#filtroFecha").on("change", cargarVentas);
+      });
+  
+      // Función para cargar ventas desde Firestore
+      function cargarVentas() {
+        const ventasQuery = query(collection(db, "ventas"), orderBy("fecha", "desc"));
+        onSnapshot(ventasQuery, (snapshot) => {
+          tablaVentas.clear();
+          snapshot.forEach((docSnap) => {
+            let venta = docSnap.data();
+            // Usar el campo "idVenta" (número entero) si existe; sino usar el id del documento
+            let idVentaMostrar = venta.idVenta ? Number(venta.idVenta) : docSnap.id;
+            // Botones de acción
+            let acciones = `<button class="btn btn-sm btn-info" onclick="verDetalleVenta('${docSnap.id}')">VER</button>`;
+            if (loggedUserRole === "admin") {
+              acciones += ` <button class="btn btn-sm btn-warning" onclick="anularVenta('${docSnap.id}')">ANULAR</button>`;
+              acciones += ` <button class="btn btn-sm btn-danger" onclick="eliminarVenta('${docSnap.id}')">ELIMINAR</button>`;
+            }
+            tablaVentas.row.add([
+              idVentaMostrar,
+              new Date(venta.fecha).toLocaleString(),
+              venta.cliente.nombre,
+              "Q" + Number(venta.total).toFixed(2),
+              venta.metodo_pago,
+              venta.estado ? venta.estado : "COMPLETADA",
+              acciones
+            ]);
           });
-          ventasHTML += `</tbody></table>`;
-        }
-        let detalleHTML = `
-          <h4>Detalle del Cierre</h4>
-          <p><strong>Fecha y Hora:</strong> ${cierre.fechaCierre} ${cierre.horaCierre || ""}</p>
-          <p><strong>Usuario:</strong> ${cierre.usuario}</p>
-          <p><strong>Monto Apertura:</strong> Q ${parseFloat(cierre.montoApertura).toFixed(2)}</p>
-          <p><strong>Total Efectivo:</strong> Q ${parseFloat(cierre.totalEfectivo).toFixed(2)}</p>
-          <p><strong>Total Tarjeta:</strong> Q ${parseFloat(cierre.totalTarjeta).toFixed(2)}</p>
-          <p><strong>Monto Final:</strong> Q ${parseFloat(cierre.montoFinal).toFixed(2)}</p>
-          <p><strong>Diferencia:</strong> <span class="${parseFloat(cierre.diferencia) < 0 ? 'text-rojo' : ''}">Q ${parseFloat(cierre.diferencia).toFixed(2)}</span></p>
-          <hr>
-          <h5>Ventas del Día</h5>
-          ${ventasHTML}
-        `;
-        Swal.fire({
-          title: "Detalle del Cierre",
-          html: detalleHTML,
-          width: "80%"
+          tablaVentas.draw();
         });
-      } catch (error) {
-        console.error("Error al obtener detalle del cierre:", error);
-        Swal.fire("Error", "No se pudo cargar el detalle del cierre.", "error");
       }
-    };
-
-    // Función para anular un cierre (solo admin)
-    window.anularCierre = async function (cierreId) {
-      if (loggedUserRole !== "admin") {
-        Swal.fire("Acceso Denegado", "No tienes permiso para anular cierres.", "error");
-        return;
-      }
-      try {
-        const cierreDoc = doc(db, "cierres", cierreId);
-        const cierreSnap = await getDoc(cierreDoc);
-        if (!cierreSnap.exists()) {
-          Swal.fire("Error", "Cierre no encontrado.", "error");
+  
+      // Función para ver el detalle de la venta y descargar el ticket en PDF, incluyendo detalle de productos vendidos
+      window.verDetalleVenta = async function (idVenta) {
+        try {
+          const ventaDoc = doc(db, "ventas", idVenta);
+          const docSnap = await getDoc(ventaDoc);
+          if (docSnap.exists()) {
+            let venta = docSnap.data();
+            venta.id = idVenta;
+            Swal.fire({
+              title: "Comprobante de Venta",
+              html: `
+                <div>
+                  <p><strong>ID:</strong> ${venta.idVenta ? Number(venta.idVenta) : venta.id}</p>
+                  <p><strong>Fecha:</strong> ${new Date(venta.fecha).toLocaleString()}</p>
+                  <p><strong>Cliente:</strong> ${venta.cliente.nombre}</p>
+                  <p><strong>Total:</strong> Q${Number(venta.total).toFixed(2)}</p>
+                  <p><strong>Método de Pago:</strong> ${venta.metodo_pago}</p>
+                  <p><strong>Estado:</strong> ${venta.estado ? venta.estado : "COMPLETADA"}</p>
+                  <button class='btn btn-sm btn-primary' onclick='descargarComprobante("${encodeURIComponent(JSON.stringify(venta))}")'>
+                    Descargar Ticket
+                  </button>
+                </div>
+              `,
+              showConfirmButton: true
+            });
+          }
+        } catch (error) {
+          Swal.fire("Error", error.toString(), "error");
+        }
+      };
+  
+      // Función para anular venta (solo admin)
+      window.anularVenta = function (idVenta) {
+        if (loggedUserRole !== "admin") {
+          Swal.fire("Acceso Denegado", "No tienes permiso para anular ventas.", "error");
           return;
         }
-        const cierre = cierreSnap.data();
-        if (cierre.estado && cierre.estado.toUpperCase() === "ANULADA") {
-          Swal.fire("El cierre ya está anulado.", "", "info");
+        const ventaDoc = doc(db, "ventas", idVenta);
+        getDoc(ventaDoc).then((docSnap) => {
+          if (docSnap.exists()) {
+            let venta = docSnap.data();
+            if (venta.estado && venta.estado.toUpperCase() === "ANULADA") {
+              Swal.fire("LA VENTA YA ESTÁ ANULADA", "", "info");
+              return;
+            }
+            Swal.fire({
+              title: "¿ANULAR VENTA?",
+              text: "Esta acción marcará la venta como anulada.",
+              icon: "warning",
+              showCancelButton: true,
+              confirmButtonText: "SÍ, ANULAR"
+            }).then((result) => {
+              if (result.isConfirmed) {
+                updateDoc(ventaDoc, { estado: "ANULADA" }).then(() => {
+                  Swal.fire("VENTA ANULADA", "", "success");
+                });
+              }
+            });
+          }
+        });
+      };
+  
+      // Función para eliminar venta (solo admin)
+      window.eliminarVenta = function (idVenta) {
+        if (loggedUserRole !== "admin") {
+          Swal.fire("Acceso Denegado", "No tienes permiso para eliminar ventas.", "error");
           return;
         }
         Swal.fire({
-          title: "¿ANULAR CIERRE?",
-          text: "Esta acción marcará el cierre como anulado.",
-          icon: "warning",
+          title: "¿ELIMINAR VENTA?",
+          text: "Esta acción eliminará la venta permanentemente.",
+          icon: "error",
           showCancelButton: true,
-          confirmButtonText: "SÍ, ANULAR"
-        }).then(async (result) => {
+          confirmButtonText: "SÍ, ELIMINAR"
+        }).then((result) => {
           if (result.isConfirmed) {
-            await updateDoc(cierreDoc, { estado: "ANULADA" });
-            Swal.fire("Cierre Anulado", "", "success");
+            deleteDoc(doc(db, "ventas", idVenta))
+              .then(() => {
+                Swal.fire("VENTA ELIMINADA", "", "success");
+              })
+              .catch((error) => {
+                Swal.fire("ERROR", error.toString(), "error");
+              });
           }
         });
-      } catch (error) {
-        console.error("Error al anular cierre:", error);
-        Swal.fire("Error", "No se pudo anular el cierre.", "error");
-      }
-    };
-
-    // Función para eliminar un cierre (solo admin)
-    window.eliminarCierre = async function (cierreId) {
-      if (loggedUserRole !== "admin") {
-        Swal.fire("Acceso Denegado", "No tienes permiso para eliminar cierres.", "error");
-        return;
-      }
-      Swal.fire({
-        title: "¿ELIMINAR CIERRE?",
-        text: "Esta acción eliminará el cierre permanentemente.",
-        icon: "error",
-        showCancelButton: true,
-        confirmButtonText: "SÍ, ELIMINAR"
-      }).then(async (result) => {
-        if (result.isConfirmed) {
-          try {
-            await deleteDoc(doc(db, "cierres", cierreId));
-            Swal.fire("Cierre Eliminado", "", "success");
-          } catch (error) {
-            Swal.fire("Error", error.toString(), "error");
+      };
+  
+      // Función para descargar y visualizar el ticket de venta en PDF con detalle de productos vendidos
+      window.descargarComprobante = function (ventaEncoded) {
+        const venta = JSON.parse(decodeURIComponent(ventaEncoded));
+        const { jsPDF } = window.jspdf;
+        // Crear un PDF tipo ticket (formato reducido: 80 x 300 mm)
+        const doc = new jsPDF({
+          orientation: "p",
+          unit: "mm",
+          format: [80, 300]
+        });
+        let y = 5;
+        const lineHeight = 5;
+        // Encabezado del ticket
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(12);
+        doc.text("TICKET DE VENTA", 40, y, { align: "center" });
+        y += lineHeight * 2;
+        // Datos básicos de la venta
+        doc.setFont("Helvetica", "normal");
+        doc.setFontSize(10);
+        doc.text(`ID: ${venta.idVenta ? Number(venta.idVenta) : venta.id}`, 5, y);
+        y += lineHeight;
+        doc.text(`Fecha: ${new Date(venta.fecha).toLocaleString()}`, 5, y);
+        y += lineHeight;
+        doc.text(`Cliente: ${venta.cliente.nombre}`, 5, y);
+        y += lineHeight;
+        doc.text(`Total: Q${Number(venta.total).toFixed(2)}`, 5, y);
+        y += lineHeight;
+        doc.text(`Pago: ${venta.metodo_pago}`, 5, y);
+        y += lineHeight * 2;
+        // Incluir detalle de productos vendidos
+        doc.setFont("Helvetica", "bold");
+        doc.setFontSize(10);
+        doc.text("PRODUCTOS:", 5, y);
+        y += lineHeight;
+        doc.setFont("Helvetica", "normal");
+        venta.productos.forEach((prod, index) => {
+          if (y > 280) {
+            doc.addPage();
+            y = 5;
           }
-        }
-      });
-    };
-
-    // Función para descargar el reporte PDF del cierre
-    window.descargarReporteCierre = function (cierre, ventasHTML) {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-      let y = 10;
-      doc.setFontSize(14);
-      doc.text(`Reporte de Cierre - ${cierre.fechaCierre}`, 10, y);
-      y += 10;
-      doc.setFontSize(10);
-      doc.text(`Hora: ${cierre.horaCierre || ""}`, 10, y);
-      y += 7;
-      doc.text(`Usuario: ${cierre.usuario}`, 10, y);
-      y += 7;
-      doc.text(`Monto Apertura: Q ${parseFloat(cierre.montoApertura).toFixed(2)}`, 10, y);
-      y += 7;
-      doc.text(`Total Efectivo: Q ${parseFloat(cierre.totalEfectivo).toFixed(2)}`, 10, y);
-      y += 7;
-      doc.text(`Total Tarjeta: Q ${parseFloat(cierre.totalTarjeta).toFixed(2)}`, 10, y);
-      y += 7;
-      doc.text(`Monto Final: Q ${parseFloat(cierre.montoFinal).toFixed(2)}`, 10, y);
-      y += 7;
-      doc.text(`Diferencia: Q ${parseFloat(cierre.diferencia).toFixed(2)}`, 10, y);
-      y += 10;
-      doc.text("Ventas del Día:", 10, y);
-      y += 7;
-      // Aquí podrías agregar más detalles de las ventas si lo deseas
-      doc.save(`Reporte_Cierre_${cierre.fechaCierre}.pdf`);
-    };
-
-    cargarCierres();
-  </script>
-</body>
+          doc.text(`${index + 1}. ${prod.producto_nombre}`, 5, y);
+          y += lineHeight;
+          doc.text(`Cant: ${prod.cantidad} x Q${Number(prod.precio_unitario || 0).toFixed(2)} = Q${Number(prod.subtotal || 0).toFixed(2)}`, 5, y);
+          y += lineHeight;
+        });
+        y += lineHeight;
+        doc.setFont("Helvetica", "bold");
+        doc.text("¡GRACIAS POR SU COMPRA!", 40, y, { align: "center" });
+        doc.output("dataurlnewwindow");
+        doc.save("ticket.pdf");
+      };
+    </script>
+  </body>
 </html>

@@ -6,8 +6,8 @@
     <title>Historial de Ventas</title>
     <!-- Bootstrap CSS -->
     <link
-      rel="stylesheet"
       href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
     />
     <!-- DataTables CSS -->
     <link
@@ -28,79 +28,46 @@
       body {
         padding: 20px;
       }
-      /* Todos los textos en la tabla se muestran en mayúsculas */
-      table.dataTable th,
-      table.dataTable td {
-        text-transform: uppercase;
-        white-space: nowrap;
+      .table-responsive {
+        margin-top: 20px;
       }
-      .date-filter,
-      .order-filter,
-      .select-filter {
-        max-width: 200px;
-        margin-right: 10px;
+      .text-rojo {
+        color: red;
       }
     </style>
   </head>
   <body>
     <div class="container">
       <h1 class="mb-4">Historial de Ventas</h1>
-      <!-- Filtros avanzados -->
+      <!-- Filtro por fecha -->
       <div class="row mb-3">
-        <div class="col-md-2">
-          <label for="fechaInicio" class="form-label">Fecha Inicio</label>
-          <input type="date" id="fechaInicio" class="form-control date-filter" />
-        </div>
-        <div class="col-md-2">
-          <label for="fechaFin" class="form-label">Fecha Fin</label>
-          <input type="date" id="fechaFin" class="form-control date-filter" />
-        </div>
-        <div class="col-md-2">
-          <label for="orderVenta" class="form-label">Ordenar por</label>
-          <select id="orderVenta" class="form-select order-filter">
-            <option value="desc" selected>Ventas más recientes</option>
-            <option value="asc">Ventas más antiguas</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <label for="metodoPagoFilter" class="form-label">Método de Pago</label>
-          <select id="metodoPagoFilter" class="form-select select-filter">
-            <option value="">TODOS</option>
-            <option value="EFECTIVO">EFECTIVO</option>
-            <option value="TARJETA">TARJETA</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <label for="estadoFilter" class="form-label">Estado</label>
-          <select id="estadoFilter" class="form-select select-filter">
-            <option value="">TODOS</option>
-            <option value="COMPLETADA">COMPLETADA</option>
-            <option value="ANULADA">ANULADA</option>
-          </select>
-        </div>
-        <div class="col-md-2">
-          <label for="buscadorGeneral" class="form-label">Buscar</label>
-          <input type="text" id="buscadorGeneral" class="form-control" placeholder="Buscar..." />
+        <div class="col-md-4">
+          <label for="filtroFecha" class="form-label">Filtrar por fecha:</label>
+          <input type="date" id="filtroFecha" class="form-control" />
         </div>
       </div>
-      <table id="ventasTable" class="table table-striped table-bordered">
-        <thead>
-          <tr>
-            <th>ID VENTA</th>
-            <th>FECHA</th>
-            <th>CLIENTE</th>
-            <th>MONTO TOTAL</th>
-            <th>MÉTODO DE PAGO</th>
-            <th>ESTADO</th>
-            <th>ACCIONES</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- Se cargarán dinámicamente desde Firestore -->
-        </tbody>
-      </table>
+      <!-- Tabla de ventas -->
+      <div class="table-responsive">
+        <table id="ventasTable" class="table table-striped table-bordered">
+          <thead>
+            <tr>
+              <th>ID VENTA</th>
+              <th>FECHA</th>
+              <th>CLIENTE</th>
+              <th>EMPLEADO</th>
+              <th>MONTO TOTAL</th>
+              <th>MÉTODO DE PAGO</th>
+              <th>ESTADO</th>
+              <th>ACCIONES</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- Se cargarán dinámicamente desde Firestore -->
+          </tbody>
+        </table>
+      </div>
     </div>
-
+  
     <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script type="module">
@@ -119,26 +86,25 @@
         deleteDoc,
         getDoc
       } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
-
+      
       // Configuración de Firebase (ajusta según tu proyecto)
       const firebaseConfig = {
         apiKey: "AIzaSyBoBj8-oqIwAOJG7aplYPWt7q4J3wigbmc",
-  authDomain: "gleedb-d9478.firebaseapp.com",
-  projectId: "gleedb-d9478",
-  storageBucket: "gleedb-d9478.firebasestorage.app",
-  messagingSenderId: "722495997438",
-  appId: "1:722495997438:web:19fd9152263a4651feacaf"
+        authDomain: "gleedb-d9478.firebaseapp.com",
+        projectId: "gleedb-d9478",
+        storageBucket: "gleedb-d9478.firebasestorage.app",
+        messagingSenderId: "722495997438",
+        appId: "1:722495997438:web:19fd9152263a4651feacaf"
       };
+  
       const app = initializeApp(firebaseConfig);
       const db = getFirestore(app);
-
+  
       // Variables globales
       let tablaVentas;
-      // Se espera que el rol del usuario se guarde en localStorage con la clave "loggedUserRole"
-      let loggedUser = localStorage.getItem("loggedUser") || "";
-      let loggedUserRole = localStorage.getItem("loggedUserRole") || "";
-
-      // Inicializar DataTable
+      const loggedUserRole = (localStorage.getItem("loggedUserRole") || "").toLowerCase();
+      const loggedUser = localStorage.getItem("loggedUser") || "";
+  
       $(document).ready(function () {
         tablaVentas = $("#ventasTable").DataTable({
           language: {
@@ -148,6 +114,7 @@
             { title: "ID VENTA" },
             { title: "FECHA" },
             { title: "CLIENTE" },
+            { title: "EMPLEADO" },
             { title: "MONTO TOTAL" },
             { title: "MÉTODO DE PAGO" },
             { title: "ESTADO" },
@@ -157,20 +124,11 @@
           responsive: true
         });
         cargarVentas();
-
-        // Eventos para filtros externos
-        $("#fechaInicio, #fechaFin, #metodoPagoFilter, #estadoFilter").on("change", function () {
-          tablaVentas.draw();
-        });
-        $("#buscadorGeneral").on("keyup", function () {
-          tablaVentas.search(this.value).draw();
-        });
-        $("#orderVenta").on("change", function () {
-          let order = $(this).val();
-          tablaVentas.order([1, order]).draw();
-        });
+  
+        // Evento para filtrar por fecha
+        $("#filtroFecha").on("change", cargarVentas);
       });
-
+  
       // Función para cargar ventas desde Firestore
       function cargarVentas() {
         const ventasQuery = query(collection(db, "ventas"), orderBy("fecha", "desc"));
@@ -178,18 +136,21 @@
           tablaVentas.clear();
           snapshot.forEach((docSnap) => {
             let venta = docSnap.data();
-            venta.id = docSnap.id;
-            // Si el usuario es admin, se muestran los botones de anular y eliminar
-            let acciones = `<button class="btn btn-sm btn-info" onclick="verVenta('${venta.id}')">📜 VER</button>`;
-            if (loggedUserRole.toLowerCase() === "admin") {
-              acciones += `<button class="btn btn-sm btn-warning" onclick="anularVenta('${venta.id}')">✖ ANULAR</button>`;
-              acciones += `<button class="btn btn-sm btn-danger" onclick="eliminarVenta('${venta.id}')">❌ ELIMINAR</button>`;
+            // Mostrar el campo "idVenta" como número entero si existe, sino usa el doc ID
+            let idVentaMostrar = venta.idVenta ? Number(venta.idVenta) : docSnap.id;
+            // Mostrar el nombre del empleado que realizó la venta; si no existe, se muestra "N/A"
+            const empleado = venta.empleadoNombre ? venta.empleadoNombre : "N/A";
+            let acciones = `<button class="btn btn-sm btn-info" onclick="verVenta('${docSnap.id}')">VER</button>`;
+            if (loggedUserRole === "admin") {
+              acciones += ` <button class="btn btn-sm btn-warning" onclick="anularVenta('${docSnap.id}')">ANULAR</button>`;
+              acciones += ` <button class="btn btn-sm btn-danger" onclick="eliminarVenta('${docSnap.id}')">ELIMINAR</button>`;
             }
             tablaVentas.row.add([
-              venta.id,
+              idVentaMostrar,
               new Date(venta.fecha).toLocaleString(),
               venta.cliente.nombre,
-              "Q" + venta.total.toFixed(2),
+              empleado,
+              "Q" + Number(venta.total).toFixed(2),
               venta.metodo_pago,
               venta.estado ? venta.estado : "COMPLETADA",
               acciones
@@ -198,28 +159,8 @@
           tablaVentas.draw();
         });
       }
-
-      // Filtro personalizado para rango de fechas, método y estado
-      $.fn.dataTable.ext.search.push(function (settings, data, dataIndex) {
-        let fechaInicio = $("#fechaInicio").val();
-        let fechaFin = $("#fechaFin").val();
-        let fechaVenta = new Date(data[1]);
-        if (fechaInicio) {
-          if (fechaVenta < new Date(fechaInicio)) return false;
-        }
-        if (fechaFin) {
-          let fin = new Date(fechaFin);
-          fin.setHours(23, 59, 59, 999);
-          if (fechaVenta > fin) return false;
-        }
-        let filtroMetodo = $("#metodoPagoFilter").val();
-        if (filtroMetodo && data[4].toUpperCase() !== filtroMetodo.toUpperCase()) return false;
-        let filtroEstado = $("#estadoFilter").val();
-        if (filtroEstado && data[5].toUpperCase() !== filtroEstado.toUpperCase()) return false;
-        return true;
-      });
-
-      // Función para ver comprobante de venta y descargar el ticket en PDF
+  
+      // Función para ver el detalle de la venta y descargar el ticket en PDF
       window.verVenta = async function (idVenta) {
         try {
           const ventaDoc = doc(db, "ventas", idVenta);
@@ -231,13 +172,16 @@
               title: "Comprobante de Venta",
               html: `
                 <div>
-                  <p><strong>ID:</strong> ${venta.id}</p>
+                  <p><strong>ID:</strong> ${venta.idVenta ? Number(venta.idVenta) : venta.id}</p>
                   <p><strong>Fecha:</strong> ${new Date(venta.fecha).toLocaleString()}</p>
                   <p><strong>Cliente:</strong> ${venta.cliente.nombre}</p>
-                  <p><strong>Total:</strong> Q${venta.total.toFixed(2)}</p>
+                  <p><strong>Empleado:</strong> ${venta.empleadoNombre ? venta.empleadoNombre : "N/A"}</p>
+                  <p><strong>Total:</strong> Q${Number(venta.total).toFixed(2)}</p>
                   <p><strong>Método de Pago:</strong> ${venta.metodo_pago}</p>
                   <p><strong>Estado:</strong> ${venta.estado ? venta.estado : "COMPLETADA"}</p>
-                  <button class="btn btn-sm btn-primary" onclick="descargarComprobante('${encodeURIComponent(JSON.stringify(venta))}')">Descargar PDF</button>
+                  <button class='btn btn-sm btn-primary' onclick='descargarComprobante("${encodeURIComponent(JSON.stringify(venta))}")'>
+                    Descargar Ticket
+                  </button>
                 </div>
               `,
               showConfirmButton: true
@@ -247,10 +191,10 @@
           Swal.fire("Error", error.toString(), "error");
         }
       };
-
+  
       // Función para anular venta (solo admin)
       window.anularVenta = function (idVenta) {
-        if (loggedUserRole.toLowerCase() !== "admin") {
+        if (loggedUserRole !== "admin") {
           Swal.fire("Acceso Denegado", "No tienes permiso para anular ventas.", "error");
           return;
         }
@@ -278,10 +222,10 @@
           }
         });
       };
-
+  
       // Función para eliminar venta (solo admin)
       window.eliminarVenta = function (idVenta) {
-        if (loggedUserRole.toLowerCase() !== "admin") {
+        if (loggedUserRole !== "admin") {
           Swal.fire("Acceso Denegado", "No tienes permiso para eliminar ventas.", "error");
           return;
         }
@@ -293,53 +237,69 @@
           confirmButtonText: "SÍ, ELIMINAR"
         }).then((result) => {
           if (result.isConfirmed) {
-            deleteDoc(doc(db, "ventas", idVenta)).then(() => {
-              Swal.fire("VENTA ELIMINADA", "", "success");
-            }).catch((error) => {
-              Swal.fire("ERROR", error.toString(), "error");
-            });
+            deleteDoc(doc(db, "ventas", idVenta))
+              .then(() => {
+                Swal.fire("VENTA ELIMINADA", "", "success");
+              })
+              .catch((error) => {
+                Swal.fire("ERROR", error.toString(), "error");
+              });
           }
         });
       };
-
-      // Función para descargar y visualizar el comprobante (ticket) en PDF y descargarlo
-      window.descargarComprobante = function(ventaEncoded) {
-        // Decodificar el objeto venta
+  
+      // Función para descargar y visualizar el ticket de venta en PDF con detalle de productos vendidos
+      window.descargarComprobante = function (ventaEncoded) {
         const venta = JSON.parse(decodeURIComponent(ventaEncoded));
         const { jsPDF } = window.jspdf;
-        // Crear un PDF con formato de ticket (80 x 300 mm)
+        // Crear un PDF tipo ticket (formato reducido: 80 x 300 mm)
         const doc = new jsPDF({
-          orientation: 'p',
-          unit: 'mm',
+          orientation: "p",
+          unit: "mm",
           format: [80, 300]
         });
         let y = 5;
         const lineHeight = 5;
-        // Encabezado
+        // Encabezado del ticket
         doc.setFont("Helvetica", "bold");
         doc.setFontSize(12);
         doc.text("TICKET DE VENTA", 40, y, { align: "center" });
         y += lineHeight * 2;
-        // Datos básicos
+        // Datos básicos de la venta
         doc.setFont("Helvetica", "normal");
         doc.setFontSize(10);
-        doc.text(`ID: ${venta.id}`, 5, y);
+        doc.text(`ID: ${venta.idVenta ? Number(venta.idVenta) : venta.id}`, 5, y);
         y += lineHeight;
         doc.text(`Fecha: ${new Date(venta.fecha).toLocaleString()}`, 5, y);
         y += lineHeight;
         doc.text(`Cliente: ${venta.cliente.nombre}`, 5, y);
         y += lineHeight;
-        doc.text(`Total: Q${venta.total.toFixed(2)}`, 5, y);
+        doc.text(`Empleado: ${venta.empleadoNombre ? venta.empleadoNombre : "N/A"}`, 5, y);
+        y += lineHeight;
+        doc.text(`Total: Q${Number(venta.total).toFixed(2)}`, 5, y);
         y += lineHeight;
         doc.text(`Pago: ${venta.metodo_pago}`, 5, y);
         y += lineHeight * 2;
-        // Mensaje final
+        // Detalle de productos vendidos
         doc.setFont("Helvetica", "bold");
         doc.setFontSize(10);
-        doc.text("¡Gracias por su compra!", 40, y, { align: "center" });
-        // Visualizar el PDF en una nueva pestaña
+        doc.text("PRODUCTOS:", 5, y);
+        y += lineHeight;
+        doc.setFont("Helvetica", "normal");
+        venta.productos.forEach((prod, index) => {
+          if (y > 280) {
+            doc.addPage();
+            y = 5;
+          }
+          doc.text(`${index + 1}. ${prod.producto_nombre}`, 5, y);
+          y += lineHeight;
+          doc.text(`Cant: ${prod.cantidad} x Q${Number(prod.precio_unitario || 0).toFixed(2)} = Q${Number(prod.subtotal || 0).toFixed(2)}`, 5, y);
+          y += lineHeight;
+        });
+        y += lineHeight;
+        doc.setFont("Helvetica", "bold");
+        doc.text("¡GRACIAS POR SU COMPRA!", 40, y, { align: "center" });
         doc.output("dataurlnewwindow");
-        // Descargar automáticamente el ticket en PDF
         doc.save("ticket.pdf");
       };
     </script>
