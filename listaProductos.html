@@ -38,7 +38,13 @@
         </select>
       </div>
 
+      <!-- Filtro de búsqueda -->
       <div class="mb-3">
+        <input type="text" id="searchInput" class="form-control" placeholder="Buscar productos...">
+      </div>
+
+      <div class="mb-3">
+        <!-- Los botones se mostrarán según el rol -->
         <button id="btnCrearProducto" class="btn btn-primary me-2">
           Crear Producto
         </button>
@@ -51,7 +57,6 @@
         <button id="btnModificarStock" class="btn btn-secondary me-2">
           Modificar Stock
         </button>
-        <!-- Botón exclusivo para admin para cargar productos desde cadena de texto -->
         <button id="btnCargarTexto" class="btn btn-info">
           Cargar con cadena de texto
         </button>
@@ -102,42 +107,35 @@
       const loggedUserRole  = localStorage.getItem("loggedUserRole") || "";
       const loggedUserStore = localStorage.getItem("loggedUserStore") || "DefaultStore";
 
-      // Se define el objeto de permisos para productos (por defecto todas en false)
+      // Definición de permisos según rol:
+      // - Admin: todos los botones.
+      // - Usuarios con tienda: solo el botón de Crear Producto.
       let userPermissions = {
         crearProducto: false,
         editarProducto: false,
         eliminarProducto: false,
-        modificarStock: false
+        modificarStock: false,
+        cargarTexto: false
       };
 
-      // Si el usuario es admin, se habilitan todas las acciones
       if (loggedUserRole.toLowerCase() === "admin") {
         userPermissions = {
           crearProducto: true,
           editarProducto: true,
           eliminarProducto: true,
-          modificarStock: true
+          modificarStock: true,
+          cargarTexto: true
         };
       } else {
-        // Para otros usuarios se leen los permisos desde localStorage (se espera que estén en la sección "productos")
-        const storedPermissions = localStorage.getItem("loggedUserPermissions");
-        if (storedPermissions) {
-          try {
-            const parsed = JSON.parse(storedPermissions);
-            if (parsed.productos) {
-              userPermissions = {
-                crearProducto: parsed.productos.agregar || false,
-                editarProducto: parsed.productos.editar || false,
-                eliminarProducto: parsed.productos.eliminar || false,
-                modificarStock: parsed.productos.stock || false
-              };
-            }
-          } catch (error) {
-            console.error("Error al parsear permisos del usuario:", error);
-          }
-        }
+        // Para usuarios con tienda, solo se habilita "crearProducto"
+        userPermissions = {
+          crearProducto: true,
+          editarProducto: false,
+          eliminarProducto: false,
+          modificarStock: false,
+          cargarTexto: false
+        };
       }
-      // Para depuración
       console.log("Permisos de productos:", userPermissions);
 
       // Variable para el filtrado de tienda
@@ -171,7 +169,6 @@
         }
       }
 
-      // Para admin se configura el select de tiendas
       if (loggedUserRole.toLowerCase() === "admin") {
         document.addEventListener("DOMContentLoaded", () => {
           loadStoreFilter();
@@ -180,17 +177,14 @@
             document.getElementById("inventoryTitle").textContent = currentStore
               ? `Inventario de: ${currentStore}`
               : "Inventario: Stock Total";
-            listenProducts(); // Se vuelve a escuchar para filtrar productos
+            listenProducts(); // Actualiza la escucha de productos según el filtro
           });
         });
       }
 
-      // Función para escuchar en tiempo real la colección "productos"
+      // Escucha en tiempo real la colección "productos"
       function listenProducts() {
-        const qProducts = query(
-          collection(db, "productos"),
-          orderBy("createdAt", "desc")
-        );
+        const qProducts = query(collection(db, "productos"), orderBy("createdAt", "desc"));
         onSnapshot(
           qProducts,
           (snapshot) => {
@@ -204,25 +198,29 @@
           },
           (error) => {
             console.error("Error en onSnapshot:", error);
-            Swal.fire(
-              "Error",
-              "No se pudieron obtener los productos: " + error.message,
-              "error"
-            );
+            Swal.fire("Error", "No se pudieron obtener los productos: " + error.message, "error");
           }
         );
       }
 
-      // Función para renderizar los productos en la tabla
+      // Función para renderizar productos filtrados
       function renderProducts() {
+        const searchQuery = document.getElementById("searchInput").value.trim().toLowerCase();
         const tbody = document.getElementById("productsBody");
         tbody.innerHTML = "";
-        if (products.length === 0) {
+        const filteredProducts = products.filter(prod => {
+          const codigo = prod.codigo?.toLowerCase() || "";
+          const descripcion = prod.descripcion?.toLowerCase() || "";
+          const talla = prod.talla?.toLowerCase() || "";
+          return codigo.includes(searchQuery) || descripcion.includes(searchQuery) || talla.includes(searchQuery);
+        });
+
+        if (filteredProducts.length === 0) {
           tbody.innerHTML =
             "<tr><td colspan='5' class='text-center'>No hay productos disponibles</td></tr>";
           return;
         }
-        products.forEach((prod) => {
+        filteredProducts.forEach((prod) => {
           const tr = document.createElement("tr");
           const displayedStock = getDisplayedStock(prod);
           tr.innerHTML = `
@@ -232,7 +230,6 @@
             <td>Q ${parseFloat(prod.precio).toFixed(2)}</td>
             <td>${displayedStock}</td>
           `;
-          // Al hacer clic se resalta la fila y se guarda el id del producto seleccionado
           tr.addEventListener("click", () => {
             document.querySelectorAll("#productsBody tr").forEach((row) =>
               row.classList.remove("table-active")
@@ -244,21 +241,18 @@
         });
       }
 
-      // Función para calcular el stock a mostrar según rol y tienda actual
-      function getDisplayedStock(product) {
+      // Calcula el stock a mostrar según rol y tienda
+      function getDisplayedStock(product, store = currentStore) {
         if (!product.stock || typeof product.stock !== "object") {
           return product.stock || 0;
         }
-        if (loggedUserRole.toLowerCase() === "admin" && !currentStore) {
-          return Object.values(product.stock).reduce(
-            (sum, val) => sum + Number(val),
-            0
-          );
+        if (loggedUserRole.toLowerCase() === "admin" && !store) {
+          return Object.values(product.stock).reduce((sum, val) => sum + Number(val), 0);
         }
-        if (loggedUserRole.toLowerCase() === "admin" && currentStore) {
-          return product.stock[currentStore] || 0;
+        if (loggedUserRole.toLowerCase() === "admin" && store) {
+          return product.stock[store] || 0;
         }
-        return product.stock[currentStore] || 0;
+        return product.stock[store] || 0;
       }
 
       /*********************************************
@@ -301,7 +295,7 @@
             descripcion: formValues.descripcion,
             talla: formValues.talla,
             precio: formValues.precio,
-            stock: {},  // Se inicia el stock como objeto vacío
+            stock: {},
             createdAt: new Date().toISOString()
           };
           await addDoc(collection(db, "productos"), newProduct);
@@ -403,7 +397,6 @@
           Swal.fire("Error", "Producto no encontrado", "error");
           return;
         }
-        // Si el usuario es admin y no ha seleccionado tienda, se le solicita seleccionar una
         if (loggedUserRole.toLowerCase() === "admin" && !currentStore) {
           Swal.fire(
             "Tienda no seleccionada",
@@ -443,8 +436,7 @@
         }
       }
 
-      // Función para obtener el stock actual según tienda
-      function getCurrentStock(product, store) {
+      function getCurrentStock(product, store = currentStore) {
         if (!product.stock || typeof product.stock !== "object") {
           return product.stock || 0;
         }
@@ -460,47 +452,39 @@
       document.addEventListener("DOMContentLoaded", () => {
         listenProducts();
 
-        // Asignación de eventos a los botones según permisos
+        // Filtro de búsqueda
+        document.getElementById("searchInput").addEventListener("input", renderProducts);
+
         const btnCrearProducto = document.getElementById("btnCrearProducto");
         const btnEditarProducto = document.getElementById("btnEditarProducto");
         const btnEliminarProducto = document.getElementById("btnEliminarProducto");
         const btnModificarStock = document.getElementById("btnModificarStock");
         const btnCargarTexto = document.getElementById("btnCargarTexto");
 
-        if (!userPermissions.crearProducto) {
-          btnCrearProducto.style.display = "none";
-        } else {
-          btnCrearProducto.addEventListener("click", crearProducto);
-        }
-
-        if (!userPermissions.editarProducto) {
-          btnEditarProducto.style.display = "none";
-        } else {
-          btnEditarProducto.addEventListener("click", editarProducto);
-        }
-
-        if (!userPermissions.eliminarProducto) {
-          btnEliminarProducto.style.display = "none";
-        } else {
-          btnEliminarProducto.addEventListener("click", eliminarProducto);
-        }
-
-        if (!userPermissions.modificarStock) {
-          btnModificarStock.style.display = "none";
-        } else {
-          btnModificarStock.addEventListener("click", modificarStock);
-        }
-
-        // El botón "Cargar con cadena de texto" se muestra solo para admin
+        // Solo admin tiene todos los botones; usuarios de tienda solo verán "Crear Producto"
         if (loggedUserRole.toLowerCase() === "admin") {
+          btnCrearProducto.style.display = "inline-block";
+          btnEditarProducto.style.display = "inline-block";
+          btnEliminarProducto.style.display = "inline-block";
+          btnModificarStock.style.display = "inline-block";
           btnCargarTexto.style.display = "inline-block";
+          btnCrearProducto.addEventListener("click", crearProducto);
+          btnEditarProducto.addEventListener("click", editarProducto);
+          btnEliminarProducto.addEventListener("click", eliminarProducto);
+          btnModificarStock.addEventListener("click", modificarStock);
           btnCargarTexto.addEventListener("click", cargarConCadenaTexto);
         } else {
+          // Para usuarios con tienda, solo se muestra "Crear Producto"
+          btnCrearProducto.style.display = "inline-block";
+          btnEditarProducto.style.display = "none";
+          btnEliminarProducto.style.display = "none";
+          btnModificarStock.style.display = "none";
           btnCargarTexto.style.display = "none";
+          btnCrearProducto.addEventListener("click", crearProducto);
         }
       });
 
-      // Nota: la función "cargarConCadenaTexto" no se muestra aquí; inclúyela según tus necesidades para carga masiva.
+      // Nota: Implementa la función "cargarConCadenaTexto" según tus necesidades para la carga masiva.
     </script>
   </body>
 </html>

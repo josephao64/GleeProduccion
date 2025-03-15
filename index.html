@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
   <head>
@@ -15,6 +14,9 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
     />
+    <!-- Favicon: GLEED.PNG -->
+    <link rel="icon" type="image/png" href="GLEED.PNG" />
+
     <style>
       /* Estilos para el menú fijo y el contenedor de contenido */
       body {
@@ -89,7 +91,7 @@
 
     <!-- Firebase SDK (versión modular: 9+) y referencia al archivo de configuración -->
     <script type="module">
-      // Importar la configuración de Firebase desde el archivo firebase-config.js
+      // Importar la configuración de Firebase desde firebase-config.js
       import { db } from "./firebase-config.js";
       // Importar funciones necesarias de Firestore
       import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
@@ -105,13 +107,16 @@
         const menuVentas = document.getElementById("menuVentas");
         const menuUsuarios = document.getElementById("menuUsuarios");
         const menuTiendas = document.getElementById("menuTiendas");
+        const menuEmpleados = document.getElementById("menuEmpleados");
 
-        // Si no es admin, ocultar ciertos menús y aplicar permisos
+        // Para usuarios que no son admin:
+        // - Se ocultan Usuarios y Tiendas.
+        // - Se muestra el menú de Empleados si el rol es "tienda" (o admin).
         if (userRol !== "admin") {
           if (menuUsuarios) menuUsuarios.style.display = "none";
           if (menuTiendas) menuTiendas.style.display = "none";
-
-          if (!perms.productos && menuProductos) {
+          // Se revisa el permiso de listaProductos para el menú de Productos
+          if (!(perms.listaProductos && perms.listaProductos.habilitado) && menuProductos) {
             menuProductos.style.display = "none";
           }
           if (!perms.entradas && menuEntradas) {
@@ -123,6 +128,15 @@
           if (!perms.salidas && menuVentas) {
             menuVentas.style.display = "none";
           }
+          // Si el rol es "tienda", se muestra el menú de Empleados (aunque sin acciones en la página empleados)
+          if (userRol === "tienda") {
+            menuEmpleados.style.display = "inline-block";
+          } else {
+            menuEmpleados.style.display = "none";
+          }
+        } else {
+          // Si es admin, se muestran todos
+          menuEmpleados.style.display = "inline-block";
         }
       };
 
@@ -132,14 +146,13 @@
         window.location.href = "login.html";
       };
 
-      // Al cargar la página, verificar si hay un usuario logueado y consultar Firestore para obtener sus datos
+      // Al cargar la página, verificar si hay un usuario logueado y obtener sus datos
       document.addEventListener("DOMContentLoaded", async function () {
         const loggedUser = localStorage.getItem("loggedUser");
         if (!loggedUser) {
           window.location.href = "login.html";
         } else {
           document.getElementById("loggedUser").innerHTML = `<i class="fa-solid fa-user"></i> ${loggedUser}`;
-
           // Consultar Firestore para obtener los datos del usuario
           const usuariosRef = collection(db, "usuarios");
           const q = query(usuariosRef, where("username", "==", loggedUser));
@@ -237,7 +250,11 @@
               </li>
             </ul>
           </li>
-          <!-- Solo admin puede ver -->
+          <!-- Apartado de Empleados: se muestra para admin y para rol tienda -->
+          <li id="menuEmpleados">
+            <a href="empleados.html" target="contentFrame">Empleados</a>
+          </li>
+          <!-- Solo admin puede ver Usuarios y Tiendas -->
           <li id="menuUsuarios">
             <a href="usuarios.html" target="contentFrame">
               <i class="fa-solid fa-user"></i> Usuarios

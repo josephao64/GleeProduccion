@@ -16,14 +16,16 @@
     />
     <!-- SweetAlert2 -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
     <style>
       body {
         padding: 20px;
       }
+      /* Estilo para el botón de ver/ocultar contraseña */
+      .btn-toggle-password {
+        font-size: 0.8rem;
+      }
     </style>
   </head>
-  
   <body>
     <div class="container">
       <h1 class="mb-4">Administración de Usuarios</h1>
@@ -98,29 +100,38 @@
               <!-- Sección para permisos personalizados -->
               <div class="mb-3">
                 <label class="form-label">Permisos Personalizados</label>
-                <!-- Permisos para Productos con sub-opciones -->
+                <!-- Bloque para permisos de Lista Productos -->
                 <fieldset class="border p-2 mb-2">
                   <legend class="w-auto mb-0">
-                    <input class="form-check-input" type="checkbox" id="permProductos" />
-                    <label class="form-check-label" for="permProductos"> Productos</label>
+                    <input class="form-check-input" type="checkbox" id="permListaProductos" />
+                    <label class="form-check-label" for="permListaProductos">Lista Productos</label>
                   </legend>
                   <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="permAgregarProducto" />
-                    <label class="form-check-label" for="permAgregarProducto">Agregar Producto</label>
+                    <input class="form-check-input" type="checkbox" id="permLPCrear" />
+                    <label class="form-check-label" for="permLPCrear">Botón Crear Producto</label>
                   </div>
                   <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="permEditarProducto" />
-                    <label class="form-check-label" for="permEditarProducto">Editar Producto</label>
+                    <input class="form-check-input" type="checkbox" id="permLPEditar" />
+                    <label class="form-check-label" for="permLPEditar">Botón Editar Producto</label>
                   </div>
                   <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="permEliminarProducto" />
-                    <label class="form-check-label" for="permEliminarProducto">Eliminar Producto</label>
+                    <input class="form-check-input" type="checkbox" id="permLPEliminar" />
+                    <label class="form-check-label" for="permLPEliminar">Botón Eliminar Producto</label>
                   </div>
                   <div class="form-check">
-                    <input class="form-check-input" type="checkbox" id="permStockProducto" />
-                    <label class="form-check-label" for="permStockProducto">Stock Producto</label>
+                    <input class="form-check-input" type="checkbox" id="permLPStock" />
+                    <label class="form-check-label" for="permLPStock">Botón Modificar Stock</label>
+                  </div>
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" id="permLPCargarTexto" />
+                    <label class="form-check-label" for="permLPCargarTexto">Botón Cargar con Cadena de Texto</label>
                   </div>
                 </fieldset>
+                <!-- Nuevo permiso para Empleados -->
+                <div class="form-check mb-2">
+                  <input class="form-check-input" type="checkbox" id="permEmpleados" />
+                  <label class="form-check-label" for="permEmpleados">Empleados</label>
+                </div>
                 <!-- Otros permisos -->
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" id="permEntradasUser" />
@@ -142,7 +153,9 @@
                   <input class="form-check-input" type="checkbox" id="permTiendasUser" />
                   <label class="form-check-label" for="permTiendasUser">Tiendas</label>
                 </div>
-                <small class="form-text text-muted">Estos permisos reemplazan los del rol asignado.</small>
+                <small class="form-text text-muted">
+                  Estos permisos reemplazan los del rol asignado.
+                </small>
               </div>
 
               <div class="mb-3">
@@ -153,7 +166,6 @@
                 </select>
               </div>
             </div>
-
             <div class="modal-footer">
               <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
                 Cancelar
@@ -320,11 +332,15 @@
               roleName: "admin",
               roleDescription: "Rol de administrador con todos los permisos",
               permissions: {
-                productos: {
-                  agregar: true,
-                  editar: true,
-                  eliminar: true,
-                  stock: true
+                listaProductos: {
+                  habilitado: true,
+                  botones: {
+                    crear: true,
+                    editar: true,
+                    eliminar: true,
+                    stock: true,
+                    cargarTexto: true
+                  }
                 },
                 entradas: true,
                 movimientos: true,
@@ -385,7 +401,27 @@
 
             const row = tbody.insertRow();
             row.insertCell(0).textContent = user.username;
-            row.insertCell(1).textContent = user.password;
+            // Celda de contraseña con botón para alternar visibilidad
+            const cellPassword = row.insertCell(1);
+            const spanPassword = document.createElement("span");
+            spanPassword.textContent = "******";
+            spanPassword.id = `pwd_${user.id}`;
+            cellPassword.appendChild(spanPassword);
+            const btnToggle = document.createElement("button");
+            btnToggle.textContent = "Ver";
+            btnToggle.classList.add("btn", "btn-sm", "btn-outline-secondary", "ms-2", "btn-toggle-password");
+            btnToggle.addEventListener("click", () => {
+              const span = document.getElementById(`pwd_${user.id}`);
+              if (span.textContent === "******") {
+                span.textContent = user.password;
+                btnToggle.textContent = "Ocultar";
+              } else {
+                span.textContent = "******";
+                btnToggle.textContent = "Ver";
+              }
+            });
+            cellPassword.appendChild(btnToggle);
+
             row.insertCell(2).textContent =
               user.rol && user.rol.toLowerCase() === "admin"
                 ? "-"
@@ -418,11 +454,8 @@
         document.getElementById("userForm").reset();
         document.getElementById("userId").value = "";
         document.getElementById("userModalLabel").textContent = "Crear Usuario";
-
-        // Habilitar campos por defecto
         document.getElementById("userStore").disabled = false;
         document.getElementById("userRole").disabled = false;
-
         new bootstrap.Modal(document.getElementById("userModal")).show();
       }
 
@@ -441,17 +474,22 @@
           return;
         }
 
-        // Recopilar permisos personalizados, incluyendo permisos de productos
-        const productosEnabled = document.getElementById("permProductos").checked;
-        const productPerms = {
-          agregar: productosEnabled ? document.getElementById("permAgregarProducto").checked : false,
-          editar: productosEnabled ? document.getElementById("permEditarProducto").checked : false,
-          eliminar: productosEnabled ? document.getElementById("permEliminarProducto").checked : false,
-          stock: productosEnabled ? document.getElementById("permStockProducto").checked : false
+        // Recopilar permisos personalizados (se utiliza la sección "listaProductos" y el nuevo permiso "empleados")
+        const listaProductosEnabled = document.getElementById("permListaProductos").checked;
+        const listaProductosPerms = {
+          crear: document.getElementById("permLPCrear").checked,
+          editar: document.getElementById("permLPEditar").checked,
+          eliminar: document.getElementById("permLPEliminar").checked,
+          stock: document.getElementById("permLPStock").checked,
+          cargarTexto: document.getElementById("permLPCargarTexto").checked
         };
-
+        const empleadosPermiso = document.getElementById("permEmpleados").checked;
         const formPerms = {
-          productos: productPerms,
+          listaProductos: {
+            habilitado: listaProductosEnabled,
+            botones: listaProductosPerms
+          },
+          empleados: empleadosPermiso,
           entradas: document.getElementById("permEntradasUser").checked,
           movimientos: document.getElementById("permMovimientosUser").checked,
           salidas: document.getElementById("permSalidasUser").checked,
@@ -469,12 +507,17 @@
         if (username.toLowerCase() === "admin") {
           userData.rol = "admin";
           userData.permissions = {
-            productos: {
-              agregar: true,
-              editar: true,
-              eliminar: true,
-              stock: true
+            listaProductos: {
+              habilitado: true,
+              botones: {
+                crear: true,
+                editar: true,
+                eliminar: true,
+                stock: true,
+                cargarTexto: true
+              }
             },
+            empleados: true,
             entradas: true,
             movimientos: true,
             salidas: true,
@@ -485,12 +528,17 @@
           if (rol.toLowerCase() === "admin") {
             userData.rol = "admin";
             userData.permissions = {
-              productos: {
-                agregar: true,
-                editar: true,
-                eliminar: true,
-                stock: true
+              listaProductos: {
+                habilitado: true,
+                botones: {
+                  crear: true,
+                  editar: true,
+                  eliminar: true,
+                  stock: true,
+                  cargarTexto: true
+                }
               },
+              empleados: true,
               entradas: true,
               movimientos: true,
               salidas: true,
@@ -506,7 +554,7 @@
               Swal.fire("Error", "Seleccione un rol.", "error");
               return;
             }
-            userData.rol    = rol;
+            userData.rol = rol;
             userData.tienda = tienda;
           }
         }
@@ -540,7 +588,8 @@
 
           document.getElementById("userId").value = userId;
           document.getElementById("username").value = user.username;
-          document.getElementById("password").value = user.password;
+          // Al editar, no se muestra la contraseña real; se deja en blanco.
+          document.getElementById("password").value = "";
           document.getElementById("userEnabled").value = user.enabled ? "true" : "false";
 
           if ((user.rol && user.rol.toLowerCase() === "admin") || user.username.toLowerCase() === "admin") {
@@ -555,38 +604,30 @@
             document.getElementById("userRole").value = user.rol || "";
           }
 
-          // Asignar permisos personalizados, incluyendo permisos de productos
-          if (user.permissions) {
-            if (user.permissions.productos) {
-              document.getElementById("permProductos").checked = true;
-              document.getElementById("permAgregarProducto").checked = !!user.permissions.productos.agregar;
-              document.getElementById("permEditarProducto").checked = !!user.permissions.productos.editar;
-              document.getElementById("permEliminarProducto").checked = !!user.permissions.productos.eliminar;
-              document.getElementById("permStockProducto").checked = !!user.permissions.productos.stock;
-            } else {
-              document.getElementById("permProductos").checked = false;
-              document.getElementById("permAgregarProducto").checked = false;
-              document.getElementById("permEditarProducto").checked = false;
-              document.getElementById("permEliminarProducto").checked = false;
-              document.getElementById("permStockProducto").checked = false;
-            }
-            document.getElementById("permEntradasUser").checked = !!user.permissions.entradas;
-            document.getElementById("permMovimientosUser").checked = !!user.permissions.movimientos;
-            document.getElementById("permSalidasUser").checked = !!user.permissions.salidas;
-            document.getElementById("permUsuariosUser").checked = !!user.permissions.usuarios;
-            document.getElementById("permTiendasUser").checked = !!user.permissions.tiendas;
+          // Asignar permisos personalizados (solo Lista Productos y Empleados)
+          if (user.permissions && user.permissions.listaProductos) {
+            document.getElementById("permListaProductos").checked = !!user.permissions.listaProductos.habilitado;
+            document.getElementById("permLPCrear").checked = !!user.permissions.listaProductos.botones.crear;
+            document.getElementById("permLPEditar").checked = !!user.permissions.listaProductos.botones.editar;
+            document.getElementById("permLPEliminar").checked = !!user.permissions.listaProductos.botones.eliminar;
+            document.getElementById("permLPStock").checked = !!user.permissions.listaProductos.botones.stock;
+            document.getElementById("permLPCargarTexto").checked = !!user.permissions.listaProductos.botones.cargarTexto;
           } else {
-            document.getElementById("permProductos").checked = false;
-            document.getElementById("permAgregarProducto").checked = false;
-            document.getElementById("permEditarProducto").checked = false;
-            document.getElementById("permEliminarProducto").checked = false;
-            document.getElementById("permStockProducto").checked = false;
-            document.getElementById("permEntradasUser").checked = false;
-            document.getElementById("permMovimientosUser").checked = false;
-            document.getElementById("permSalidasUser").checked = false;
-            document.getElementById("permUsuariosUser").checked = false;
-            document.getElementById("permTiendasUser").checked = false;
+            document.getElementById("permListaProductos").checked = false;
+            document.getElementById("permLPCrear").checked = false;
+            document.getElementById("permLPEditar").checked = false;
+            document.getElementById("permLPEliminar").checked = false;
+            document.getElementById("permLPStock").checked = false;
+            document.getElementById("permLPCargarTexto").checked = false;
           }
+          // Asignar el permiso para Empleados
+          document.getElementById("permEmpleados").checked = !!user.permissions?.empleados;
+          // Otros permisos
+          document.getElementById("permEntradasUser").checked = !!user.permissions?.entradas;
+          document.getElementById("permMovimientosUser").checked = !!user.permissions?.movimientos;
+          document.getElementById("permSalidasUser").checked = !!user.permissions?.salidas;
+          document.getElementById("permUsuariosUser").checked = !!user.permissions?.usuarios;
+          document.getElementById("permTiendasUser").checked = !!user.permissions?.tiendas;
 
           document.getElementById("userModalLabel").textContent = "Editar Usuario";
           new bootstrap.Modal(document.getElementById("userModal")).show();
@@ -636,7 +677,6 @@
       async function loadRoles() {
         try {
           await ensureAdminRole();
-
           const rolesRef = collection(db, "roles");
           const qRoles = query(rolesRef, orderBy("roleName"));
           const snapshot = await getDocs(qRoles);
@@ -666,23 +706,20 @@
       function loadRolesTable() {
         const tbody = document.querySelector("#rolesTable tbody");
         if (!tbody) return;
-
         tbody.innerHTML = "";
         roles.forEach((role) => {
           const row = tbody.insertRow();
           row.insertCell(0).textContent = role.roleName;
-
           const perms = [];
           if (role.permissions) {
-            if (role.permissions.productos) {
-              perms.push("productos");
+            if (role.permissions.listaProductos) {
+              perms.push("listaProductos");
             }
             for (const key in role.permissions) {
-              if (key !== "productos" && role.permissions[key]) perms.push(key);
+              if (key !== "listaProductos" && role.permissions[key]) perms.push(key);
             }
           }
           row.insertCell(1).textContent = perms.join(", ");
-
           const cellActions = row.insertCell(2);
           cellActions.innerHTML = `
             <button class="btn btn-sm btn-primary me-1" onclick="editRole('${role.id}')">Editar</button>
@@ -706,15 +743,13 @@
       document.getElementById("roleForm").addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        const roleId   = document.getElementById("roleId").value;
+        const roleId = document.getElementById("roleId").value;
         const roleName = document.getElementById("roleName").value.trim();
         if (!roleName) {
           Swal.fire("Error", "Ingrese un nombre de rol.", "error");
           return;
         }
-
         const rolePerms = {
-          productos: document.getElementById("permProductosRole").checked,
           entradas: document.getElementById("permEntradasRole").checked,
           movimientos: document.getElementById("permMovimientosRole").checked,
           salidas: document.getElementById("permSalidasRole").checked,
@@ -752,18 +787,14 @@
             Swal.fire("Error", "Rol no encontrado.", "error");
             return;
           }
-
           const roleData = docSnap.data();
           document.getElementById("roleId").value = roleId;
           document.getElementById("roleName").value = roleData.roleName || "";
-
-          document.getElementById("permProductosRole").checked = !!roleData.permissions?.productos;
           document.getElementById("permEntradasRole").checked = !!roleData.permissions?.entradas;
           document.getElementById("permMovimientosRole").checked = !!roleData.permissions?.movimientos;
           document.getElementById("permSalidasRole").checked = !!roleData.permissions?.salidas;
           document.getElementById("permUsuariosRole").checked = !!roleData.permissions?.usuarios;
           document.getElementById("permTiendasRole").checked = !!roleData.permissions?.tiendas;
-
           document.getElementById("roleEditModalLabel").textContent = "Editar Rol";
           new bootstrap.Modal(document.getElementById("roleEditModal")).show();
         } catch (error) {
@@ -782,7 +813,6 @@
           cancelButtonText: "Cancelar"
         });
         if (!result.isConfirmed) return;
-
         try {
           await deleteDoc(doc(db, "roles", roleId));
           Swal.fire("Éxito", "Rol eliminado.", "success");
@@ -801,7 +831,7 @@
         await loadRoles();
         loadUsers();
 
-        // Asignar evento al botón "Crear Usuario" según permisos
+        // Mostrar botón "Crear Usuario" solo si el permiso está activo
         const btnCrearUsuario = document.getElementById("btnCrearUsuario");
         if (!userPermissions.crearUsuario) {
           btnCrearUsuario.style.display = "none";
@@ -809,7 +839,7 @@
           btnCrearUsuario.addEventListener("click", showUserForm);
         }
 
-        // Asignar evento al botón "Administrar Roles" según permisos
+        // Botón para "Administrar Roles"
         const btnAdministrarRoles = document.getElementById("btnAdministrarRoles");
         if (!userPermissions.administrarRoles) {
           btnAdministrarRoles.style.display = "none";
