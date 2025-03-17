@@ -134,11 +134,3 @@ h5 {
   margin-bottom: 10px;
   font-weight: bold;
 }
-
-.menu-icon {
-  max-width: 30px; /* Para imágenes, se usa max-width; para FA, se usará font-size */
-  font-size: 30px; /* Para iconos de Font Awesome */
-  margin-right: 6px;
-  vertical-align: middle;
-  filter: brightness(0) invert(1); /* Opcional: si quieres que se muestren en blanco */
-}
