@@ -1,0 +1,76 @@
+/* ======== RESET GENERAL ======== */
+body {
+  padding: 20px;
+  background-color: #f8f9fa;
+  font-family: 'Arial', sans-serif;
+}
+
+/* ======== TABLA ======== */
+.table th, .table td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.table-responsive {
+  margin-top: 20px;
+}
+
+.btn {
+  margin: 0 2px;
+}
+
+/* ======== DIFERENCIAS NEGATIVAS EN ROJO ======== */
+.text-rojo {
+  color: red;
+  font-weight: bold;
+}
+
+/* ======== VENTANAS MODALES (Swal) ======== */
+.swal2-popup {
+  font-size: 14px !important;
+}
+
+h5 {
+  margin-top: 15px;
+  margin-bottom: 10px;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* ======== TABLAS INTERNAS EN DETALLE ======== */
+.table-bordered th, .table-bordered td {
+  vertical-align: middle;
+  text-align: center;
+}
+
+.table-bordered {
+  margin-bottom: 20px;
+}
+
+/* ======== SECCIONES Y SEPARACIONES ======== */
+.section-header {
+  font-size: 16px;
+  font-weight: bold;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  text-decoration: underline;
+}
+
+/* ======== ESTÉTICA EN PANTALLAS PEQUEÑAS ======== */
+@media (max-width: 768px) {
+  body {
+    padding: 10px;
+  }
+
+  h1 {
+    font-size: 1.8rem;
+  }
+
+  .table {
+    font-size: 0.9rem;
+  }
+
+  .swal2-popup {
+    font-size: 12px !important;
+  }
+}
