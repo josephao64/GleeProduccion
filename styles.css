@@ -1,0 +1,32 @@
+body {
+  padding: 20px;
+}
+
+.table-responsive {
+  margin-top: 20px;
+}
+
+.text-rojo {
+  color: red;
+  font-weight: bold;
+}
+
+.text-verde {
+  color: green;
+  font-weight: bold;
+}
+
+.table th, .table td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.btn {
+  margin: 0 2px;
+}
+
+h5 {
+  margin-top: 15px;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
