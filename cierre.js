@@ -3,7 +3,7 @@ import { collection, query, where, orderBy, getDocs, getDoc, updateDoc, deleteDo
 
 const loggedUserRole = (localStorage.getItem("loggedUserRole") || "").toLowerCase();
 let tablaCierres;
-
+//hOLA//
 $(document).ready(function () {
   tablaCierres = $("#tablaCierres").DataTable({
     language: { url: "https://cdn.datatables.net/plug-ins/1.13.4/i18n/es-ES.json" },
