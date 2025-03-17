@@ -16,87 +16,14 @@
     />
     <!-- Favicon: GLEED.PNG -->
     <link rel="icon" type="image/png" href="GLEED.PNG" />
+    <!-- Archivo CSS externo -->
+    <link rel="stylesheet" href="styles.css" />
 
-    <style>
-      /* Estilos para el menú fijo y el contenedor de contenido */
-      body {
-        display: flex;
-        margin: 0;
-        min-height: 100vh;
-      }
-      /* Menú lateral fijo con flex para posicionar el bloque de usuario al final */
-      #sidebar {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        width: 250px;
-        background-color: #343a40;
-        color: #fff;
-        position: fixed;
-        height: 100vh;
-        overflow-y: auto;
-        padding: 20px;
-      }
-      #sidebar h2 {
-        font-size: 1.5rem;
-        margin-bottom: 1rem;
-      }
-      /* Menú de opciones */
-      #sidebar ul {
-        padding: 0;
-        list-style: none;
-      }
-      #sidebar ul li a {
-        display: block;
-        padding: 10px 15px;
-        color: #fff;
-        text-decoration: none;
-        border-radius: 4px;
-        margin-bottom: 5px;
-      }
-      #sidebar ul li a:hover {
-        background-color: #495057;
-      }
-      /* Bloque de información del usuario al final del menú */
-      #sidebar .user-info {
-        padding-top: 20px;
-        border-top: 1px solid #495057;
-        text-align: center;
-      }
-      #sidebar .user-info span {
-        display: block;
-        font-weight: bold;
-      }
-      #sidebar .logout-btn {
-        background: none;
-        border: none;
-        color: #fff;
-        cursor: pointer;
-        font-size: 1rem;
-        margin-top: 5px;
-      }
-      /* Contenedor principal: se desplaza a la derecha del menú */
-      #content {
-        margin-left: 250px;
-        padding: 20px;
-        width: calc(100% - 250px);
-      }
-      /* Ajusta el iframe para ocupar casi todo el espacio vertical */
-      #contentFrame {
-        width: 100%;
-        height: 90vh;
-        border: none;
-      }
-    </style>
-
-    <!-- Firebase SDK (versión modular: 9+) y referencia al archivo de configuración -->
+    <!-- Firebase SDK (versión modular: 9+) y configuración -->
     <script type="module">
-      // Importar la configuración de Firebase desde firebase-config.js
       import { db } from "./firebase-config.js";
-      // Importar funciones necesarias de Firestore
       import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
 
-      // Función para aplicar permisos al menú según rol y permisos del usuario
       window.applyMenuPermissions = function (userData) {
         const userRol = (userData.rol || "").toLowerCase();
         const perms = userData.permissions || {};
@@ -109,13 +36,9 @@
         const menuTiendas = document.getElementById("menuTiendas");
         const menuEmpleados = document.getElementById("menuEmpleados");
 
-        // Para usuarios que no son admin:
-        // - Se ocultan Usuarios y Tiendas.
-        // - Se muestra el menú de Empleados si el rol es "tienda" (o admin).
         if (userRol !== "admin") {
           if (menuUsuarios) menuUsuarios.style.display = "none";
           if (menuTiendas) menuTiendas.style.display = "none";
-          // Se revisa el permiso de listaProductos para el menú de Productos
           if (!(perms.listaProductos && perms.listaProductos.habilitado) && menuProductos) {
             menuProductos.style.display = "none";
           }
@@ -128,32 +51,27 @@
           if (!perms.salidas && menuVentas) {
             menuVentas.style.display = "none";
           }
-          // Si el rol es "tienda", se muestra el menú de Empleados (aunque sin acciones en la página empleados)
           if (userRol === "tienda") {
             menuEmpleados.style.display = "inline-block";
           } else {
             menuEmpleados.style.display = "none";
           }
         } else {
-          // Si es admin, se muestran todos
           menuEmpleados.style.display = "inline-block";
         }
       };
 
-      // Función para cerrar sesión
       window.logout = function () {
         localStorage.removeItem("loggedUser");
         window.location.href = "login.html";
       };
 
-      // Al cargar la página, verificar si hay un usuario logueado y obtener sus datos
       document.addEventListener("DOMContentLoaded", async function () {
         const loggedUser = localStorage.getItem("loggedUser");
         if (!loggedUser) {
           window.location.href = "login.html";
         } else {
           document.getElementById("loggedUser").innerHTML = `<i class="fa-solid fa-user"></i> ${loggedUser}`;
-          // Consultar Firestore para obtener los datos del usuario
           const usuariosRef = collection(db, "usuarios");
           const q = query(usuariosRef, where("username", "==", loggedUser));
           try {
@@ -181,9 +99,11 @@
     <!-- Menú lateral fijo -->
     <nav id="sidebar">
       <div>
-        <h2>Menú Principal</h2>
+        <!-- En lugar de "Menú Principal", mostramos la imagen GLEED.png -->
+        <div class="text-center mb-4">
+          <img src="GLEED2.png" alt="GLEED" class="img-fluid" style="max-width: 150px;">
+        </div>
         <ul>
-          <!-- Cada li con ID para controlarlo desde applyMenuPermissions -->
           <li id="menuProductos">
             <a href="listaProductos.html" target="contentFrame">Productos</a>
           </li>
@@ -250,11 +170,9 @@
               </li>
             </ul>
           </li>
-          <!-- Apartado de Empleados: se muestra para admin y para rol tienda -->
           <li id="menuEmpleados">
             <a href="empleados.html" target="contentFrame">Empleados</a>
           </li>
-          <!-- Solo admin puede ver Usuarios y Tiendas -->
           <li id="menuUsuarios">
             <a href="usuarios.html" target="contentFrame">
               <i class="fa-solid fa-user"></i> Usuarios

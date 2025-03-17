@@ -525,7 +525,6 @@ async function procesarVenta() {
   if (!formData) return;
   
   // Construir la venta, incluyendo el nombre del empleado
-  let ventaId = generarIdVentaCorta();
   let venta = {
     idVenta: ventaId,
     fecha: new Date().toISOString(),
@@ -542,7 +541,8 @@ async function procesarVenta() {
     metodo_pago: formData.pagoObj.metodo,
     cambio: formData.pagoObj.cambio || 0,
     usuario: usuarioActual,
-    idApertura: idAperturaActivo,
+    // Usamos el número incremental almacenado en datosApertura:
+    idApertura: datosApertura.idApertura,
     empleadoNombre: empNombre
   };
   
@@ -732,7 +732,7 @@ async function cerrarCaja() {
       <input type="number" id="montoFinal" class="swal2-input" placeholder="Monto final en caja (Q)">
     `,
     preConfirm: () => {
-      const mf = parseInt(document.getElementById("montoFinal").value);
+      const mf = parseFloat(document.getElementById("montoFinal").value);
       if (isNaN(mf)) {
         Swal.showValidationMessage("Monto final inválido");
       }
@@ -740,8 +740,13 @@ async function cerrarCaja() {
     }
   });
   if (formCierre === undefined) return;
-  let montoFinal = parseInt(formCierre) || 0;
-  let qVentas = query(collection(db, "ventas"), where("idApertura", "==", idAperturaActivo));
+  let montoFinal = parseFloat(formCierre) || 0;
+
+  // Consultar ventas asociadas a la apertura activa
+  let qVentas = query(
+    collection(db, "ventas"),
+    where("idApertura", "==", idAperturaActivo)
+  );
   try {
     const snap = await getDocs(qVentas);
     let totalEfectivo = 0;
@@ -760,20 +765,21 @@ async function cerrarCaja() {
       ventasDetalle.push(venta);
     });
     let totalGeneral = totalEfectivo + totalTarjeta + totalTransferencia;
-    // TOTAL EFECTIVO (Sistema): Fondo Apertura + Ventas en Efectivo
-    const totalEfectivoSistema = (montoApertura || 0) + totalEfectivo;
-    // TOTAL INGRESADO (Cajero) se toma del monto final ingresado
+    // TOTAL EFECTIVO (Sistema): Fondo de Apertura + Ventas en Efectivo
+    const totalEfectivoSistema = Number(montoApertura) + totalEfectivo;
+    // TOTAL INGRESADO (Cajero): se toma del monto final ingresado
     const totalIngresado = montoFinal;
     const diferencia = totalEfectivoSistema - totalIngresado;
     let now = new Date();
     let horaCierre = now.toTimeString().split(" ")[0];
     let cierreData = {
-      idApertura: idAperturaActivo,
+      // Se usa el valor incremental de apertura en lugar del Firestore doc ID
+      idApertura: datosApertura.idApertura,
       fechaApertura: datosApertura.fechaApertura,
       horaApertura: datosApertura.horaApertura,
       fechaCierre: fechaHoy,
       horaCierre,
-      montoApertura: datosApertura.montoApertura, // Incluir el fondo de apertura
+      montoApertura: datosApertura.montoApertura, // Fondo de apertura
       totalEfectivo,
       totalTarjeta,
       totalTransferencia,
@@ -783,7 +789,10 @@ async function cerrarCaja() {
       diferencia,
       usuario: usuarioActual
     };
+    
+    // Marcar la apertura como cerrada
     await updateDoc(doc(db, "aperturas", idAperturaActivo), { activo: false });
+    // Registrar el cierre
     await addDoc(collection(db, "cierres"), cierreData);
     cajaAbierta = false;
     idAperturaActivo = null;
@@ -796,6 +805,7 @@ async function cerrarCaja() {
     Swal.fire("Error", error.toString(), "error");
   }
 }
+
 
 function generarReporteCierreHTML(ventas, cierre) {
   let htmlReporte = `
