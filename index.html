@@ -99,13 +99,16 @@
     <!-- Menú lateral fijo -->
     <nav id="sidebar">
       <div>
-        <!-- En lugar de "Menú Principal", mostramos la imagen GLEED.png -->
+        <!-- Imagen superior -->
         <div class="text-center mb-4">
-          <img src="GLEED2.png" alt="GLEED" class="img-fluid" style="max-width: 150px;">
+          <img src="img\GLEED2.png" alt="GLEED" class="img-fluid" style="max-width: 150px;">
         </div>
         <ul>
           <li id="menuProductos">
-            <a href="listaProductos.html" target="contentFrame">Productos</a>
+            <a href="listaProductos.html" target="contentFrame">
+              <img src="img\agregar-producto.png" alt="Agregar Producto" class="menu-icon" />
+              Productos
+            </a>
           </li>
           <li id="menuEntradas">
             <a
@@ -115,17 +118,24 @@
               data-bs-target="#submenuEntradas"
               aria-expanded="false"
             >
+            <img src="img\entradaproducto.png" alt="Agregar Producto" class="menu-icon" />
               Entradas
             </a>
             <ul class="collapse submenu" id="submenuEntradas">
               <li>
-                <a href="entradaMercaderia.html" target="contentFrame">Entrada Mercadería</a>
+                <a href="entradaMercaderia.html" target="contentFrame">
+                  <img src="img\nuevo.png" alt="Agregar Producto" class="menu-icon" />
+                  Entrada Mercadería</a>
               </li>
               <li>
-                <a href="traslados.html" target="contentFrame">Traslados</a>
+                <a href="traslados.html" target="contentFrame">
+                  <img src="img\camion-de-carga.png" alt="Agregar Producto" class="menu-icon" />
+                  Traslados</a>
               </li>
               <li>
-                <a href="devolucion.html" target="contentFrame">Devolución</a>
+                <a href="devolucion.html" target="contentFrame">
+                  <img src="img\transferir.png" alt="Agregar Producto" class="menu-icon" />
+                  Devolución</a>
               </li>
             </ul>
           </li>
@@ -137,14 +147,19 @@
               data-bs-target="#submenuMovimientos"
               aria-expanded="false"
             >
+            <img src="img\traslados.png" alt="Agregar Producto" class="menu-icon" />
               Movimientos
             </a>
             <ul class="collapse submenu" id="submenuMovimientos">
               <li>
-                <a href="realizarMovimiento.html" target="contentFrame">Realizar Movimiento</a>
+                <a href="realizarMovimiento.html" target="contentFrame">
+                  <img src="img\Movimiento.png" alt="Agregar Producto" class="menu-icon" />
+                  Realizar Movimiento</a>
               </li>
               <li>
-                <a href="historiasMovimientos.html" target="contentFrame">Historias de Movimientos</a>
+                <a href="historiasMovimientos.html" target="contentFrame">
+                  <img src="img\historial1.png" alt="Agregar Producto" class="menu-icon" />
+                  Historias de Movimientos</a>
               </li>
             </ul>
           </li>
@@ -156,31 +171,42 @@
               data-bs-target="#submenuVentas"
               aria-expanded="false"
             >
+            <img src="img\ventas.png" alt="Agregar Producto" class="menu-icon" />
               Ventas
             </a>
             <ul class="collapse submenu" id="submenuVentas">
               <li>
-                <a href="ventas.html" target="contentFrame">Ventas</a>
+                <a href="ventas.html" target="contentFrame">
+                  <img src="img\carro.png" alt="Agregar Producto" class="menu-icon" />
+                  
+                  Ventas</a>
               </li>
               <li>
-                <a href="ventasHistorial.html" target="contentFrame">Ventas Historial</a>
+                <a href="ventasHistorial.html" target="contentFrame">
+                  <img src="img\historial.png" alt="Agregar Producto" class="menu-icon" />
+                  
+                  Ventas Historial</a>
               </li>
               <li>
-                <a href="cierre.html" target="contentFrame">Cierre</a>
+                <a href="cierre.html" target="contentFrame">
+                  <img src="img\cierre.png" alt="Agregar Producto" class="menu-icon" />
+                  Cierre</a>
               </li>
             </ul>
           </li>
           <li id="menuEmpleados">
-            <a href="empleados.html" target="contentFrame">Empleados</a>
+            <a href="empleados.html" target="contentFrame">
+              <img src="img\vendedor.png" alt="Agregar Producto" class="menu-icon" />
+              Vendedores</a>
           </li>
           <li id="menuUsuarios">
             <a href="usuarios.html" target="contentFrame">
-              <i class="fa-solid fa-user"></i> Usuarios
+              <i class="fa-solid fa-user menu-icon"></i> Usuarios
             </a>
           </li>
           <li id="menuTiendas">
             <a href="tiendas.html" target="contentFrame">
-              <i class="fa-solid fa-store"></i> Tiendas
+              <i class="fa-solid fa-store menu-icon"></i> Tiendas
             </a>
           </li>
         </ul>
@@ -195,7 +221,7 @@
       </div>
     </nav>
 
-    <!-- Contenedor principal: se carga el contenido en un iframe -->
+    <!-- Contenedor principal -->
     <div id="content">
       <iframe id="contentFrame" name="contentFrame" src="listaProductos.html"></iframe>
     </div>
