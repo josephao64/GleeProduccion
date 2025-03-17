@@ -114,7 +114,7 @@ window.verDetalleCierre = async function (cierreId) {
       </table>
 
       <table class="table table-bordered">
-        <thead><tr><th>VENTA TOTAL</th></tr></thead>
+        <thead><tr><th>Venta Total</th></tr></thead>
         <tbody><tr><td>Q ${totalGeneralVentas.toFixed(2)}</td></tr></tbody>
       </table>
 
