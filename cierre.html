@@ -78,22 +78,20 @@
   
     <!-- Script principal (Firebase v9 modular) -->
     <script type="module">
-      // Importar configuración y funciones de Firebase
       import { db } from "./firebase-config.js";
       import {
         collection,
         query,
         orderBy,
         getDocs,
-        onSnapshot,
-        where,
-        doc,
+        getDoc,
         updateDoc,
         deleteDoc,
-        getDoc
+        where,
+        doc
       } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
   
-      // Obtener el rol del usuario desde localStorage
+      // Obtener el rol del usuario (se usa para definir permisos)
       const loggedUserRole = (localStorage.getItem("loggedUserRole") || "").toLowerCase();
   
       let tablaCierres;
@@ -119,7 +117,6 @@
         });
         cargarCierres();
   
-        // Evento para filtrar por fecha
         $("#filtroFecha").on("change", cargarCierres);
       });
   
@@ -129,11 +126,10 @@
         let cierresQuery;
   
         if (filtroFecha) {
-          // Para filtrar por un día, definimos un rango:
+          // Definir un rango para un día (suponemos que fechaCierre se guarda como "YYYY-MM-DD")
           const start = new Date(filtroFecha);
           const end = new Date(filtroFecha);
           end.setDate(end.getDate() + 1);
-          // Suponemos que en la colección "cierres" el campo "fechaCierre" se almacena como una cadena en formato "YYYY-MM-DD"
           cierresQuery = query(
             collection(db, "cierres"),
             where("fechaCierre", ">=", start.toISOString().split("T")[0]),
@@ -154,9 +150,10 @@
           snapshot.forEach((docSnap) => {
             const cierre = docSnap.data();
             cierre.id = docSnap.id;
-            // Concatenar Fecha y Hora
-            const fechaHora = cierre.fechaCierre + " " + (cierre.horaCierre || "");
-            // Botones de acción: solo admin tiene anular y eliminar
+            // Convertir fecha y hora en un objeto Date para formatear a cadena local
+            const fechaHora = new Date(cierre.fechaCierre + "T" + (cierre.horaCierre || "00:00:00")).toLocaleString();
+  
+            // Botones de acción: VER; para admin también ANULAR y ELIMINAR
             let acciones = `<button class="btn btn-sm btn-info" onclick="verDetalleCierre('${docSnap.id}')">VER</button>`;
             if (loggedUserRole === "admin") {
               acciones += ` <button class="btn btn-sm btn-warning" onclick="anularCierre('${docSnap.id}')">ANULAR</button>`;
@@ -180,7 +177,7 @@
         tablaCierres.draw();
       }
   
-      // Función para ver el detalle del cierre, incluyendo ventas registradas con el nombre del empleado
+      // Función para ver el detalle de un cierre (similar a ventas)
       window.verDetalleCierre = async function (cierreId) {
         try {
           const cierreDoc = await getDoc(doc(db, "cierres", cierreId));
@@ -189,12 +186,15 @@
             return;
           }
           const cierre = cierreDoc.data();
-          // Se asume que el campo "fechaCierre" es una cadena en formato "YYYY-MM-DD"
+          // Formatear la fecha y hora usando un objeto Date
+          const cierreDate = new Date(cierre.fechaCierre + "T" + (cierre.horaCierre || "00:00:00"));
+          const fechaHora = cierreDate.toLocaleString();
+  
+          // Definir un rango para obtener las ventas del día (según el campo "fecha")
           const start = new Date(cierre.fechaCierre);
           const end = new Date(cierre.fechaCierre);
           end.setDate(end.getDate() + 1);
   
-          // Filtrar ventas cuyo campo "fecha" esté en el rango del día
           const ventasQuery = query(
             collection(db, "ventas"),
             where("fecha", ">=", start.toISOString()),
@@ -211,7 +211,7 @@
                   <th>N° Documento</th>
                   <th>Forma de Pago</th>
                   <th>Monto (Q)</th>
-                  <th>Empleado</th>
+                  <th>Vendedor</th>
                 </tr>
               </thead>
               <tbody>`;
@@ -221,14 +221,15 @@
                 <td>${venta.idVenta ? Number(venta.idVenta) : index + 1}</td>
                 <td>${venta.metodo_pago || "-"}</td>
                 <td>Q ${Number(venta.total || 0).toFixed(2)}</td>
-                <td>${venta.empleadoNombre || "N/A"}</td>
+                <td>${venta.vendedor || "N/A"}</td>
               </tr>`;
             });
             ventasHTML += `</tbody></table>`;
           }
+  
           let detalleHTML = `
             <h4>Detalle del Cierre</h4>
-            <p><strong>Fecha y Hora:</strong> ${cierre.fechaCierre} ${cierre.horaCierre || ""}</p>
+            <p><strong>Fecha y Hora:</strong> ${fechaHora}</p>
             <p><strong>Cajero:</strong> ${cierre.usuario}</p>
             <p><strong>Monto Apertura:</strong> Q ${Number(cierre.montoApertura || 0).toFixed(0)}</p>
             <p><strong>Total Efectivo:</strong> Q ${Number(cierre.totalEfectivo || 0).toFixed(2)}</p>
@@ -312,7 +313,7 @@
         });
       };
   
-      // Función para descargar el reporte PDF del cierre, incluyendo el detalle de las ventas con el empleado
+      // Función para descargar el reporte PDF del cierre
       window.descargarReporteCierre = function (cierre, ventasHTML) {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF({ orientation: "p", unit: "mm", format: "a4" });
@@ -341,7 +342,6 @@
         y += 10;
         doc.text("Ventas del Día:", 10, y);
         y += 7;
-        // Aquí se podrían agregar más detalles si es necesario
         doc.save(`Reporte_Cierre_${cierre.fechaCierre}.pdf`);
       };
   

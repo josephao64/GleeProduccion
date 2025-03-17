@@ -60,13 +60,14 @@ function generarIdVentaCorta() {
 async function getNextAperturaId() {
   try {
     const aperturasRef = collection(db, "aperturas");
-    const q = query(aperturasRef, orderBy("idApertura", "desc"), limit(1));
+    // Se ordena por el campo "numeroApertura" (entero incremental)
+    const q = query(aperturasRef, orderBy("numeroApertura", "desc"), limit(1));
     const snapshot = await getDocs(q);
     let nextId = 1;
     if (!snapshot.empty) {
       snapshot.forEach((docSnap) => {
         const data = docSnap.data();
-        nextId = parseInt(data.idApertura) + 1;
+        nextId = parseInt(data.numeroApertura) + 1;
       });
     }
     return nextId;
@@ -77,7 +78,7 @@ async function getNextAperturaId() {
 }
 
 /*******************************************************
- * Función para obtener el nombre del empleado según su código
+ * Función para obtener el nombre del vendedor según su código
  *******************************************************/
 async function getEmployeeName(codigo) {
   try {
@@ -93,7 +94,7 @@ async function getEmployeeName(codigo) {
     }
     return empName || codigo;
   } catch (error) {
-    console.error("Error al obtener nombre de empleado:", error);
+    console.error("Error al obtener nombre del vendedor:", error);
     return codigo;
   }
 }
@@ -330,7 +331,7 @@ function renderCart() {
 /*******************************************************
  * Procesar Venta
  * - Se solicita primero el tipo de venta (Física o en Línea).
- * - Luego se solicita el código del empleado (3 caracteres) para registrar quién realizó la venta.
+ * - Luego se solicita el código del vendedor (3 caracteres) para registrar quién realizó la venta.
  * - Dependiendo del tipo, se solicitan datos adicionales.
  *******************************************************/
 async function procesarVenta() {
@@ -357,11 +358,11 @@ async function procesarVenta() {
   });
   if (!saleCategory) return;
   
-  // Solicitar el código del empleado (3 caracteres)
+  // Solicitar el código del vendedor (3 caracteres)
   const { value: empCodigo } = await Swal.fire({
-    title: "Código del Empleado",
+    title: "Código del Vendedor",
     input: "text",
-    inputLabel: "Ingrese el código del empleado (3 caracteres)",
+    inputLabel: "Ingrese el código del vendedor (3 caracteres)",
     inputAttributes: {
       maxlength: 3,
       pattern: "^[A-Za-z0-9]{3}$",
@@ -375,7 +376,7 @@ async function procesarVenta() {
   });
   if (!empCodigo) return;
   
-  // Obtener el nombre del empleado según el código
+  // Obtener el nombre del vendedor según el código
   const empNombre = await getEmployeeName(empCodigo);
   
   let totalVenta = parseFloat(document.getElementById("totalVenta").textContent) || 0;
@@ -524,7 +525,7 @@ async function procesarVenta() {
   }
   if (!formData) return;
   
-  // Construir la venta, incluyendo el nombre del empleado
+  // Construir la venta, incluyendo el nombre del vendedor
   let ventaId = generarIdVentaCorta();
   let venta = {
     idVenta: ventaId,
@@ -543,7 +544,7 @@ async function procesarVenta() {
     cambio: formData.pagoObj.cambio || 0,
     usuario: usuarioActual,
     idApertura: idAperturaActivo,
-    empleadoNombre: empNombre
+    vendedor: empNombre
   };
   
   // Actualizar el stock de los productos mediante un batch
@@ -611,7 +612,7 @@ function descargarComprobante(venta) {
   y += lineHeight;
   doc.text(`Cajero: ${venta.usuario}`, 10, y);
   y += lineHeight;
-  doc.text(`Empleado: ${venta.empleadoNombre}`, 10, y);
+  doc.text(`Vendedor: ${venta.vendedor}`, 10, y);
   
   // Datos del Cliente
   y += lineHeight * 1.5;
@@ -651,9 +652,20 @@ function descargarComprobante(venta) {
   // Sumarios
   const fondoApertura = Number(datosApertura.montoApertura || 0);
   const ventaEfectivo = venta.metodo_pago.toLowerCase() === "efectivo" ? Number(venta.total || 0) : 0;
+  // TOTAL EFECTIVO (Sistema): Monto de apertura + Ventas en efectivo
   const totalEfectivoSistema = fondoApertura + ventaEfectivo;
   const totalIngresado = venta.metodo_pago.toLowerCase() === "efectivo" ? Number(venta.total || 0) : Number(venta.total || 0);
-  const diferencia = totalEfectivoSistema - totalIngresado;
+  
+  let diff = totalIngresado - totalEfectivoSistema;
+  let labelDiferencia;
+  if (diff > 0) {
+    labelDiferencia = "Sobrante";
+  } else if (diff < 0) {
+    labelDiferencia = "Faltante";
+    diff = Math.abs(diff);
+  } else {
+    labelDiferencia = "Exacto";
+  }
   
   y += lineHeight * 1.5;
   doc.text(`VENTA TOTAL: Q${Number(venta.total || 0).toFixed(2)}`, 10, y);
@@ -662,7 +674,7 @@ function descargarComprobante(venta) {
   y += lineHeight;
   doc.text(`TOTAL INGRESADO (Cajero): Q${totalIngresado.toFixed(2)}`, 10, y);
   y += lineHeight;
-  doc.text(`DIFERENCIA: Q${diferencia.toFixed(2)}`, 10, y);
+  doc.text(`${labelDiferencia}: Q${diff.toFixed(2)}`, 10, y);
   y += lineHeight;
   doc.text(`Método de Pago: ${venta.metodo_pago}`, 10, y);
   if (venta.metodo_pago.toLowerCase() === "efectivo") {
@@ -694,17 +706,17 @@ async function abrirCaja() {
     }
   });
   if (!monto) return;
-  // Convertir el monto a entero
   montoApertura = parseInt(monto);
   let now = new Date();
-  let fecha = now.toISOString().split("T")[0];
-  let hora = now.toTimeString().split(" ")[0];
-  let idApertura = nextAperturaId; // Número incremental
+  // Formateo de fecha y hora local para apertura
+  let fechaApertura = now.getFullYear() + "-" + (now.getMonth() + 1).toString().padStart(2, "0") + "-" + now.getDate().toString().padStart(2, "0");
+  let horaApertura = now.toTimeString().split(" ")[0];
+  let numeroApertura = nextAperturaId; // Número incremental
   let apertura = {
-    idApertura, // Valor entero
-    fechaApertura: fecha,
-    horaApertura: hora,
-    montoApertura, // Se almacena el monto de apertura
+    numeroApertura,
+    fechaApertura,
+    horaApertura,
+    montoApertura,
     usuario: usuarioActual,
     activo: true
   };
@@ -712,8 +724,8 @@ async function abrirCaja() {
     const docRef = await addDoc(collection(db, "aperturas"), apertura);
     cajaAbierta = true;
     idAperturaActivo = docRef.id;
-    datosApertura = apertura; // Asegurarse de guardar el monto de apertura
-    Swal.fire("Caja Abierta", `Apertura registrada. Fondo: Q${montoApertura.toFixed(2)} (N° Apertura: ${idApertura})`, "success");
+    datosApertura = apertura;
+    Swal.fire("Caja Abierta", `Apertura registrada. Fondo: Q${montoApertura.toFixed(2)} (N° Apertura: ${numeroApertura})`, "success");
   } catch (error) {
     Swal.fire("Error", error.message, "error");
   }
@@ -724,11 +736,13 @@ async function cerrarCaja() {
     Swal.fire("Error", "No hay una apertura activa", "warning");
     return;
   }
-  let fechaHoy = new Date().toISOString().split("T")[0];
+  let now = new Date();
+  // Formateo correcto de la fecha de cierre
+  let fechaCierre = now.getFullYear() + "-" + (now.getMonth() + 1).toString().padStart(2, "0") + "-" + now.getDate().toString().padStart(2, "0");
   const { value: formCierre } = await Swal.fire({
     title: "Cerrar Caja",
     html: `
-      <p>Fecha de cierre: ${fechaHoy}</p>
+      <p>Fecha de cierre: ${fechaCierre}</p>
       <input type="number" id="montoFinal" class="swal2-input" placeholder="Monto final en caja (Q)">
     `,
     preConfirm: () => {
@@ -741,13 +755,16 @@ async function cerrarCaja() {
   });
   if (formCierre === undefined) return;
   let montoFinal = parseInt(formCierre) || 0;
+  
   let qVentas = query(collection(db, "ventas"), where("idApertura", "==", idAperturaActivo));
   try {
     const snap = await getDocs(qVentas);
     let totalEfectivo = 0;
     let totalTarjeta = 0;
     let totalTransferencia = 0;
+    let totalOnline = 0;
     let ventasDetalle = [];
+    
     snap.forEach(docSnap => {
       let venta = docSnap.data();
       if (venta.metodo_pago?.toLowerCase() === "efectivo") {
@@ -756,37 +773,54 @@ async function cerrarCaja() {
         totalTarjeta += Number(venta.total || 0);
       } else if (venta.metodo_pago?.toLowerCase() === "transferencia") {
         totalTransferencia += Number(venta.total || 0);
+      } else if (venta.metodo_pago?.toLowerCase() === "en línea") {
+        totalOnline += Number(venta.total || 0);
       }
       ventasDetalle.push(venta);
     });
-    let totalGeneral = totalEfectivo + totalTarjeta + totalTransferencia;
-    // TOTAL EFECTIVO (Sistema): Fondo Apertura + Ventas en Efectivo
+    
+    let totalGeneral = totalEfectivo + totalTarjeta + totalTransferencia + totalOnline;
+    // TOTAL EFECTIVO (Sistema): Monto de apertura + Ventas en efectivo
     const totalEfectivoSistema = (montoApertura || 0) + totalEfectivo;
-    // TOTAL INGRESADO (Cajero) se toma del monto final ingresado
     const totalIngresado = montoFinal;
-    const diferencia = totalEfectivoSistema - totalIngresado;
-    let now = new Date();
+    
+    let diff = totalIngresado - totalEfectivoSistema;
+    let labelDiferencia;
+    if (diff > 0) {
+      labelDiferencia = "Sobrante";
+    } else if (diff < 0) {
+      labelDiferencia = "Faltante";
+      diff = Math.abs(diff);
+    } else {
+      labelDiferencia = "Exacto";
+    }
+    
     let horaCierre = now.toTimeString().split(" ")[0];
+    
     let cierreData = {
-      idApertura: idAperturaActivo,
+      idApertura: datosApertura.numeroApertura,
       fechaApertura: datosApertura.fechaApertura,
       horaApertura: datosApertura.horaApertura,
-      fechaCierre: fechaHoy,
+      fechaCierre,
       horaCierre,
-      montoApertura: datosApertura.montoApertura, // Incluir el fondo de apertura
+      montoApertura: datosApertura.montoApertura,
       totalEfectivo,
       totalTarjeta,
       totalTransferencia,
+      totalOnline,
       totalGeneral,
       totalEfectivoSistema,
       totalIngresado,
-      diferencia,
+      diferencia: diff,
+      labelDiferencia,
       usuario: usuarioActual
     };
+    
     await updateDoc(doc(db, "aperturas", idAperturaActivo), { activo: false });
     await addDoc(collection(db, "cierres"), cierreData);
     cajaAbierta = false;
     idAperturaActivo = null;
+    
     Swal.fire({
       title: "Cierre Registrado",
       html: generarReporteCierreHTML(ventasDetalle, cierreData),
@@ -815,27 +849,36 @@ function generarReporteCierreHTML(ventas, cierre) {
         </div>
       </div>
       <div class="row mb-3">
-        <div class="col-md-4 summary-box bg-light">
+        <div class="col-md-3 summary-box bg-light">
           <strong>Fondo Apertura:</strong> Q ${Number(cierre.montoApertura || 0).toFixed(2)}
         </div>
-        <div class="col-md-4 summary-box bg-light">
+        <div class="col-md-3 summary-box bg-light">
           <strong>Venta Efectivo:</strong> Q ${Number(cierre.totalEfectivo || 0).toFixed(2)}
         </div>
-        <div class="col-md-4 summary-box bg-light">
-          <strong>VENTA TOTAL:</strong> Q ${Number(cierre.totalGeneral || 0).toFixed(2)}
+        <div class="col-md-3 summary-box bg-light">
+          <strong>Venta Tarjeta:</strong> Q ${Number(cierre.totalTarjeta || 0).toFixed(2)}
+        </div>
+        <div class="col-md-3 summary-box bg-light">
+          <strong>Venta Transferencia:</strong> Q ${Number(cierre.totalTransferencia || 0).toFixed(2)}
         </div>
       </div>
       <div class="row mb-3">
-        <div class="col-md-6 summary-box bg-light">
+        <div class="col-md-3 summary-box bg-light">
+          <strong>Venta en Línea:</strong> Q ${Number(cierre.totalOnline || 0).toFixed(2)}
+        </div>
+        <div class="col-md-3 summary-box bg-light">
+          <strong>VENTA TOTAL:</strong> Q ${Number(cierre.totalGeneral || 0).toFixed(2)}
+        </div>
+        <div class="col-md-3 summary-box bg-light">
           <strong>TOTAL EFECTIVO (Sistema):</strong> Q ${Number(cierre.totalEfectivoSistema || 0).toFixed(2)}
         </div>
-        <div class="col-md-6 summary-box bg-light">
+        <div class="col-md-3 summary-box bg-light">
           <strong>TOTAL INGRESADO (Cajero):</strong> Q ${Number(cierre.totalIngresado || 0).toFixed(2)}
         </div>
       </div>
       <div class="row mb-3">
         <div class="col-md-12 summary-box bg-light">
-          <strong>DIFERENCIA:</strong> Q ${Number(cierre.diferencia || 0).toFixed(2)}
+          <strong>${cierre.labelDiferencia}:</strong> Q ${Number(cierre.diferencia || 0).toFixed(2)}
         </div>
       </div>
       <h4>Detalles de Operaciones</h4>
@@ -845,7 +888,7 @@ function generarReporteCierreHTML(ventas, cierre) {
             <th>N° Documento</th>
             <th>Forma de Pago</th>
             <th>Monto Pagado</th>
-            <th>Empleado</th>
+            <th>Vendedor</th>
           </tr>
         </thead>
         <tbody>`;
@@ -855,7 +898,7 @@ function generarReporteCierreHTML(ventas, cierre) {
             <td>${v.idVenta || index + 1}</td>
             <td>${v.metodo_pago || "-"}</td>
             <td>Q ${Number(v.total || 0).toFixed(2)}</td>
-            <td>${v.empleadoNombre || "-"}</td>
+            <td>${v.vendedor || "-"}</td>
           </tr>`;
   });
   htmlReporte += `
@@ -872,8 +915,8 @@ async function loadProductos() {
   try {
     const cProductos = collection(db, "productos");
     const qProds = query(cProductos, orderBy("createdAt", "desc"));
-    const snapshot = await getDocs(qProds);
     productos = [];
+    const snapshot = await getDocs(qProds);
     snapshot.forEach(docSnap => {
       let prod = docSnap.data();
       prod.id = docSnap.id;
