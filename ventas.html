@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+}<!DOCTYPE html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
@@ -105,7 +105,7 @@
         </div>
       </div>
     </div>
-    
+
     <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <!-- Script de Ventas -->
@@ -181,7 +181,7 @@
         }
       }
 
-      // Obtener el nombre del vendedor según su código (retorna null si no existe)
+      // Obtener el nombre del empleado según su código (retorna null si no existe)
       async function getEmployeeName(codigo) {
         try {
           const empleadosRef = collection(db, "empleados");
@@ -197,7 +197,7 @@
           });
           return empName;
         } catch (error) {
-          console.error("Error al obtener nombre de vendedor:", error);
+          console.error("Error al obtener nombre de empleado:", error);
           return null;
         }
       }
@@ -487,27 +487,13 @@
               <input type="email" id="clienteCorreo" class="swal2-input" placeholder="Correo (opc)">
               <input type="text" id="clienteDireccion" class="swal2-input" placeholder="Dirección (opc)">
               <hr>
-              <h4>RESUMEN DE VENTAS</h4>
-              <table class="table table-bordered">
-                <thead class="table-light">
-                  <tr>
-                    <th>Efectivo</th>
-                    <th>Tarjeta</th>
-                    <th>Transferencia</th>
-                    <th>Línea</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Q ${(Number(datosApertura.montoApertura) + 0).toFixed(2)}</td>
-                    <td>Q 0.00</td>
-                    <td>Q 0.00</td>
-                    <td>Q 0.00</td>
-                    <td>Q ${totalVenta.toFixed(2)}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <h4>Detalle de la Venta</h4>
+              ${resumenHtml}
+              <select id="metodoPago" class="swal2-select">
+                <option value="Efectivo">Efectivo</option>
+                <option value="Tarjeta">Tarjeta</option>
+                <option value="Transferencia">Transferencia</option>
+              </select>
               <div id="pagoEfectivoContainer">
                 <input type="number" id="montoRecibido" class="swal2-input" value="${totalVenta}" placeholder="Monto recibido (Q)">
               </div>
@@ -583,27 +569,8 @@
               <input type="email" id="clienteCorreo" class="swal2-input" placeholder="Correo (opc)">
               <input type="text" id="clienteDireccion" class="swal2-input" placeholder="Dirección (opc)">
               <hr>
-              <h4>RESUMEN DE VENTAS</h4>
-              <table class="table table-bordered">
-                <thead class="table-light">
-                  <tr>
-                    <th>Efectivo</th>
-                    <th>Tarjeta</th>
-                    <th>Transferencia</th>
-                    <th>Línea</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>Q ${(Number(datosApertura.montoApertura) + 0).toFixed(2)}</td>
-                    <td>Q 0.00</td>
-                    <td>Q 0.00</td>
-                    <td>Q 0.00</td>
-                    <td>Q ${totalVenta.toFixed(2)}</td>
-                  </tr>
-                </tbody>
-              </table>
+              <h4>Detalle de la Venta</h4>
+              ${resumenHtml}
               <input type="text" id="comprobantePago" class="swal2-input" placeholder="Comprobante de Pago">
               <textarea id="comentarioVenta" class="swal2-textarea" placeholder="Comentario (opcional)"></textarea>
             `,
@@ -664,7 +631,7 @@
           numeroTransferencia: formData.pagoObj.numeroTransferencia || ""
         };
 
-        // Actualizar el stock mediante batch
+        // Actualizar stock mediante batch
         const batch = writeBatch(db);
         for (let item of cart) {
           let prodRef = doc(db, "productos", item.productId);
@@ -703,14 +670,14 @@
         }
       }
 
-      // Función para descargar comprobante PDF
+      // Función para descargar comprobante PDF con el reporte de cierre actualizado
       function descargarComprobante(venta) {
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
         let y = 10;
         const lineHeight = 10;
 
-        // Encabezado
+        // Encabezado del ticket
         doc.setFontSize(16);
         doc.text("Comprobante de Venta", 10, y);
         y += lineHeight * 1.5;
@@ -758,69 +725,75 @@
           y += lineHeight;
         });
 
-        // Sumarios
+        // Sumarios y Totales
         const fondoApertura = Number(datosApertura.montoApertura || 0);
-        const totalEfectivoSistema = fondoApertura + Number(venta.total || 0); // Asumiendo que "venta.total" ya incluye efectivo + demás ventas, ajuste según lógica.
+        // En "Resumen de Ventas", el efectivo es solo el total de ventas en efectivo (sin apertura)
+        const ventaEfectivo = venta.metodo_pago.toLowerCase() === "efectivo" ? Number(venta.total || 0) : 0;
+        // En "Totales", el efectivo es la suma del monto de apertura + ventas en efectivo
+        const totalEfectivoSistema = fondoApertura + ventaEfectivo;
         const totalIngresado = venta.metodo_pago.toLowerCase() === "efectivo" ? Number(venta.total || 0) : Number(venta.total || 0);
         const diferencia = totalEfectivoSistema - totalIngresado;
+
         y += lineHeight * 1.5;
-        doc.text(`RESUMEN DE VENTAS`, 10, y);
+        doc.setFontSize(14);
+        doc.text("Resumen de Ventas", 10, y);
         y += lineHeight;
-        // Primera tabla: Resumen de Ventas
+        // Primera tabla: Resumen de Ventas (Efectivo muestra solo la venta en efectivo)
         doc.autoTable({
           startY: y,
           head: [["Efectivo", "Tarjeta", "Transferencia", "Línea", "Total"]],
           body: [[
-            "Q " + (totalEfectivoSistema.toFixed(2)),
-            "Q " + "0.00",
-            "Q " + "0.00",
-            "Q " + "0.00",
-            "Q " + (Number(venta.total || 0).toFixed(2))
+            "Q " + Number(ventaEfectivo || 0).toFixed(2),
+            "Q " + Number(venta.totalTarjeta || 0).toFixed(2),
+            "Q " + Number(venta.totalTransferencia || 0).toFixed(2),
+            "Q " + Number(venta.ventaLinea || 0).toFixed(2),
+            "Q " + Number(venta.total || 0).toFixed(2)
           ]],
           theme: "grid",
-          styles: { halign: "center" }
+          margin: { top: y }
         });
         y = doc.lastAutoTable.finalY + lineHeight;
-        // Segunda tabla: Totales
-        doc.text("TOTALES", 10, y);
+
+        doc.setFontSize(14);
+        doc.text("Totales", 10, y);
         y += lineHeight;
-        // En esta tabla, la columna "Efectivo" es el total efectivo (suma de fondo de apertura y efectivo)
-        // "Arqueo" es total ingresado y "Diferencia" se mostrará en verde si arqueo > total efectivo y rojo si es menor.
-        let colorDiferencia = "black";
-        if (totalIngresado > totalEfectivoSistema) {
-          colorDiferencia = "green";
-        } else if (totalIngresado < totalEfectivoSistema) {
-          colorDiferencia = "red";
-        }
+        // Segunda tabla: Totales (Efectivo aquí es monto de apertura + venta en efectivo)
+        let diffText = Number(diferencia || 0).toFixed(2);
+        let diffColor = totalIngresado >= totalEfectivoSistema ? [0, 128, 0] : [255, 0, 0]; // verde o rojo
         doc.autoTable({
           startY: y,
           head: [["Efectivo", "Arqueo", "Diferencia"]],
           body: [[
-            "Q " + totalEfectivoSistema.toFixed(2),
-            "Q " + totalIngresado.toFixed(2),
-            { content: "Q " + diferencia.toFixed(2), styles: { textColor: colorDiferencia } }
+            "Q " + Number(totalEfectivoSistema || 0).toFixed(2),
+            "Q " + Number(totalIngresado || 0).toFixed(2),
+            diffText
           ]],
+          didParseCell: function (data) {
+            if (data.column.index === 2 && data.cell.raw === diffText) {
+              data.cell.styles.textColor = diffColor;
+            }
+          },
           theme: "grid",
-          styles: { halign: "center" }
+          margin: { top: y }
         });
         y = doc.lastAutoTable.finalY + lineHeight;
-        // Detalle de Ventas
+
+        // Tabla Detallada de Ventas
+        doc.setFontSize(14);
         doc.text("Ventas Detalladas", 10, y);
         y += lineHeight;
         doc.autoTable({
           startY: y,
           head: [["Id Venta", "Método de pago", "N° Referencia", "Monto", "Vendedor"]],
-          body: venta.productos.map((prod, index) => {
-            return [
-              venta.idVenta || (index + 1),
-              venta.metodo_pago,
-              (venta.metodo_pago.toLowerCase() === "tarjeta" || venta.metodo_pago.toLowerCase() === "transferencia" || venta.metodo_pago.toLowerCase() === "en línea") ? (venta.numeroTransferencia || "-") : "-",
-              "Q " + (Number(venta.total || 0).toFixed(2)),
-              venta.empleadoNombre || "-"
-            ];
-          }),
+          body: ventas.map((v, index) => [
+            v.idVenta || (index + 1),
+            v.metodo_pago || "-",
+            (["tarjeta", "transferencia", "en línea"].includes(v.metodo_pago.toLowerCase())) ? (v.numeroTransferencia || "-") : "-",
+            "Q " + Number(v.total || 0).toFixed(2),
+            v.empleadoNombre || "-"
+          ]),
           theme: "grid",
-          styles: { halign: "center" }
+          margin: { top: y }
         });
 
         doc.output("dataurlnewwindow");
@@ -868,18 +841,17 @@
         }
       }
 
-      // Cierre de Caja con reporte actualizado
+      // Cierre de Caja con formato actualizado
       async function cerrarCaja() {
         if (!cajaAbierta || !idAperturaActivo) {
           Swal.fire("Error", "No hay una apertura activa", "warning");
           return;
         }
-        let idCierre = generarIdCorto();
-        let fechaHoyRaw = new Date();
+        let now = new Date();
         let fechaHoy =
-          ("0" + fechaHoyRaw.getDate()).slice(-2) + "/" +
-          ("0" + (fechaHoyRaw.getMonth() + 1)).slice(-2) + "/" +
-          fechaHoyRaw.getFullYear();
+          ("0" + now.getDate()).slice(-2) + "/" +
+          ("0" + (now.getMonth() + 1)).slice(-2) + "/" +
+          now.getFullYear();
         const { value: formCierre } = await Swal.fire({
           title: "Cerrar Caja",
           html: `
@@ -925,24 +897,25 @@
           const totalEfectivoSistema = Number(montoApertura) + totalEfectivo;
           const totalIngresado = montoFinal;
           const diferencia = totalEfectivoSistema - totalIngresado;
-          let now = new Date();
           let horaCierre = now.toTimeString().split(" ")[0];
 
+          let idCierre = generarIdCorto();
+
           let cierreData = {
-            idCierre,
+            idCierre, // ID de cierre
             idAperturaNum: datosApertura.idAperturaNum || 0,
             fechaApertura: datosApertura.fechaApertura,
             horaApertura: datosApertura.horaApertura,
-            fechaCierre,
+            fechaCierre: fechaHoy,
             horaCierre,
             lugar: currentStore || "Local",
             montoApertura: datosApertura.montoApertura,
-            totalEfectivo,
+            totalEfectivo,              // Solo ventas en efectivo (sin apertura)
             totalTarjeta,
             totalTransferencia,
             ventaLinea,
             totalGeneral,
-            totalEfectivoSistema,
+            totalEfectivoSistema,       // Apertura + efectivo
             totalIngresado,
             diferencia,
             usuario: usuarioActual
@@ -962,10 +935,11 @@
         }
       }
 
-      // Generar Reporte de Cierre con formato actualizado
+      // Generar Reporte de Cierre con el formato solicitado
       function generarReporteCierreHTML(ventas, cierre) {
         let htmlReporte = `
           <div class="container">
+            <!-- Encabezado -->
             <div class="row">
               <div class="col-md-6">
                 <strong>ID cierre:</strong> ${cierre.idCierre}<br>
@@ -977,56 +951,52 @@
                 <strong>Monto de Apertura:</strong> Q ${Number(cierre.montoApertura || 0).toFixed(2)}
               </div>
             </div>
-            <br>
-            <div class="row">
-              <div class="col-md-12">
-                <h5>RESUMEN DE VENTAS</h5>
-                <table class="table table-bordered">
-                  <thead class="table-light">
-                    <tr>
-                      <th>Efectivo</th>
-                      <th>Tarjeta</th>
-                      <th>Transferencia</th>
-                      <th>Línea</th>
-                      <th>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>Q ${Number(totalEfectivoSistema.toFixed(2))}</td>
-                      <td>Q ${Number(cierre.totalTarjeta || 0).toFixed(2)}</td>
-                      <td>Q ${Number(cierre.totalTransferencia || 0).toFixed(2)}</td>
-                      <td>Q ${Number(cierre.ventaLinea || 0).toFixed(2)}</td>
-                      <td>Q ${Number(cierre.totalGeneral || 0).toFixed(2)}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <div class="row">
-              <div class="col-md-12">
-                <h5>TOTALES</h5>
-                <table class="table table-bordered">
-                  <thead class="table-light">
-                    <tr>
-                      <th>Efectivo</th>
-                      <th>Arqueo</th>
-                      <th>Diferencia</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <td>Q ${Number(totalEfectivoSistema.toFixed(2))}</td>
-                      <td>Q ${Number(cierre.totalIngresado || 0).toFixed(2)}</td>
-                      <td style="color: ${cierre.totalIngresado > totalEfectivoSistema ? 'green' : (cierre.totalIngresado < totalEfectivoSistema ? 'red' : 'black')}">
-                        Q ${Number(cierre.diferencia || 0).toFixed(2)}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            <h5>Ventas Detalladas</h5>
+            <hr>
+            <!-- Resumen de Ventas -->
+            <h4>Resumen de Ventas</h4>
+            <table class="table table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th>Efectivo</th>
+                  <th>Tarjeta</th>
+                  <th>Transferencia</th>
+                  <th>Línea</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Q ${Number(cierre.totalEfectivo || 0).toFixed(2)}</td>
+                  <td>Q ${Number(cierre.totalTarjeta || 0).toFixed(2)}</td>
+                  <td>Q ${Number(cierre.totalTransferencia || 0).toFixed(2)}</td>
+                  <td>Q ${Number(cierre.ventaLinea || 0).toFixed(2)}</td>
+                  <td>Q ${Number(cierre.totalGeneral || 0).toFixed(2)}</td>
+                </tr>
+              </tbody>
+            </table>
+            <!-- Totales -->
+            <h4>Totales</h4>
+            <table class="table table-bordered">
+              <thead class="table-light">
+                <tr>
+                  <th>Efectivo</th>
+                  <th>Arqueo</th>
+                  <th>Diferencia</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Q ${Number(cierre.totalEfectivoSistema || 0).toFixed(2)}</td>
+                  <td>Q ${Number(cierre.totalIngresado || 0).toFixed(2)}</td>`;
+        let diffText = Number(cierre.diferencia || 0).toFixed(2);
+        let diffColor = cierre.totalIngresado >= cierre.totalEfectivoSistema ? "green" : "red";
+        htmlReporte += `<td style="color: ${diffColor};">${diffText}</td>`;
+        htmlReporte += `
+                </tr>
+              </tbody>
+            </table>
+            <!-- Detalle de Ventas -->
+            <h4>Ventas Detalladas</h4>
             <table class="table table-bordered">
               <thead class="table-light">
                 <tr>
@@ -1043,7 +1013,7 @@
                 <tr>
                   <td>${v.idVenta || index + 1}</td>
                   <td>${v.metodo_pago || "-"}</td>
-                  <td>${(v.metodo_pago.toLowerCase() === "tarjeta" || v.metodo_pago.toLowerCase() === "transferencia" || v.metodo_pago.toLowerCase() === "en línea") ? (v.numeroTransferencia || "-") : "-"}</td>
+                  <td>${(["tarjeta", "transferencia", "en línea"].includes(v.metodo_pago.toLowerCase())) ? (v.numeroTransferencia || "-") : "-"}</td>
                   <td>Q ${Number(v.total || 0).toFixed(2)}</td>
                   <td>${v.empleadoNombre || "-"}</td>
                 </tr>`;
