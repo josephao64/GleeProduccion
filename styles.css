@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /* Estilos generales */
 
 :root {
@@ -142,3 +143,141 @@ h5 {
   vertical-align: middle;
   filter: brightness(0) invert(1); /* Opcional: si quieres que se muestren en blanco */
 }
+=======
+/* Estilos generales */
+
+:root {
+  --primary-color: #5D1049;
+  --secondary-color: #FF6F61;
+  --accent-color: #F7CAC9;
+  --background-color: #F2F2F2;
+  --text-color: #333333;
+}
+
+.btn-primary {
+  background-color: var(--secondary-color);
+  border-color: var(--secondary-color);
+}
+
+.btn-primary:hover {
+  background-color: var(--accent-color);
+  border-color: var(--accent-color);
+}
+
+body {
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: 'Helvetica Neue', sans-serif;
+  display: flex;
+  margin: 0;
+  min-height: 100vh;
+  background-color: #f5f5f5;
+}
+
+/* Menú lateral fijo y estilos internos */
+#sidebar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 250px;
+  color: #fff;
+  position: fixed;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 20px;
+  background-color: var(--primary-color);
+}
+
+#sidebar {
+  background-color: #3e3742; /* Color azul */
+  /* ...otras propiedades... */
+}
+
+
+#sidebar h2 {
+  font-size: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+#sidebar ul {
+  padding: 0;
+  list-style: none;
+}
+
+#sidebar ul li a {
+  display: block;
+  padding: 10px 15px;
+  color: #fff;
+  text-decoration: none;
+  border-radius: 4px;
+  margin-bottom: 5px;
+}
+
+#sidebar ul li a:hover {
+  background-color: #825e65;
+}
+
+/* Bloque de información del usuario al final del menú */
+#sidebar .user-info {
+  padding-top: 20px;
+  border-top: 1px solid #ebc4a9;
+  text-align: center;
+}
+
+#sidebar .user-info span {
+  display: block;
+  font-weight: bold;
+}
+
+#sidebar .logout-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1rem;
+  margin-top: 5px;
+}
+
+/* Contenedor principal: se desplaza a la derecha del menú */
+#content {
+  margin-left: 250px;
+  padding: 20px;
+  width: calc(100% - 250px);
+}
+
+/* Ajusta el iframe para ocupar casi todo el espacio vertical */
+#contentFrame {
+  width: 100%;
+  height: 90vh;
+  border: none;
+}
+
+.table-responsive {
+  margin-top: 20px;
+}
+
+.text-rojo {
+  color: red;
+  font-weight: bold;
+}
+
+.text-verde {
+  color: green;
+  font-weight: bold;
+}
+
+.table th, .table td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.btn {
+  margin: 0 2px;
+}
+
+h5 {
+  margin-top: 15px;
+  margin-bottom: 10px;
+  font-weight: bold;
+}
+>>>>>>> 2311f6942aa97d3ee0b300aed053c87966002159

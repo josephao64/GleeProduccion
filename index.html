@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="es">
   <head>
@@ -230,3 +231,211 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   </body>
 </html>
+=======
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Glee</title>
+    <!-- Bootstrap hola CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Font Awesome para íconos -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <!-- Favicon: GLEED.PNG -->
+    <link rel="icon" type="image/png" href="GLEED.PNG" />
+    <!-- Archivo CSS externo -->
+    <link rel="stylesheet" href="styles.css" />
+
+    <!-- Firebase SDK (versión modular: 9+) y configuración -->
+    <script type="module">
+      import { db } from "./firebase-config.js";
+      import { collection, query, where, getDocs } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore.js";
+
+      window.applyMenuPermissions = function (userData) {
+        const userRol = (userData.rol || "").toLowerCase();
+        const perms = userData.permissions || {};
+
+        const menuProductos = document.getElementById("menuProductos");
+        const menuEntradas = document.getElementById("menuEntradas");
+        const menuMovimientos = document.getElementById("menuMovimientos");
+        const menuVentas = document.getElementById("menuVentas");
+        const menuUsuarios = document.getElementById("menuUsuarios");
+        const menuTiendas = document.getElementById("menuTiendas");
+        const menuEmpleados = document.getElementById("menuEmpleados");
+
+        if (userRol !== "admin") {
+          if (menuUsuarios) menuUsuarios.style.display = "none";
+          if (menuTiendas) menuTiendas.style.display = "none";
+          if (!(perms.listaProductos && perms.listaProductos.habilitado) && menuProductos) {
+            menuProductos.style.display = "none";
+          }
+          if (!perms.entradas && menuEntradas) {
+            menuEntradas.style.display = "none";
+          }
+          if (!perms.movimientos && menuMovimientos) {
+            menuMovimientos.style.display = "none";
+          }
+          if (!perms.salidas && menuVentas) {
+            menuVentas.style.display = "none";
+          }
+          if (userRol === "tienda") {
+            menuEmpleados.style.display = "inline-block";
+          } else {
+            menuEmpleados.style.display = "none";
+          }
+        } else {
+          menuEmpleados.style.display = "inline-block";
+        }
+      };
+
+      window.logout = function () {
+        localStorage.removeItem("loggedUser");
+        window.location.href = "login.html";
+      };
+
+      document.addEventListener("DOMContentLoaded", async function () {
+        const loggedUser = localStorage.getItem("loggedUser");
+        if (!loggedUser) {
+          window.location.href = "login.html";
+        } else {
+          document.getElementById("loggedUser").innerHTML = `<i class="fa-solid fa-user"></i> ${loggedUser}`;
+          const usuariosRef = collection(db, "usuarios");
+          const q = query(usuariosRef, where("username", "==", loggedUser));
+          try {
+            const querySnapshot = await getDocs(q);
+            if (!querySnapshot.empty) {
+              querySnapshot.forEach((doc) => {
+                const userData = doc.data();
+                if (userData.tienda) {
+                  document.getElementById("userStore").textContent = userData.tienda;
+                }
+                window.applyMenuPermissions(userData);
+              });
+            } else {
+              localStorage.removeItem("loggedUser");
+              window.location.href = "login.html";
+            }
+          } catch (error) {
+            console.error("Error fetching user data:", error);
+          }
+        }
+      });
+    </script>
+  </head>
+  <body>
+    <!-- Menú lateral fijo -->
+    <nav id="sidebar">
+      <div>
+        <!-- En lugar de "Menú Principal", mostramos la imagen GLEED.png -->
+        <div class="text-center mb-4">
+          <img src="GLEED2.png" alt="GLEED" class="img-fluid" style="max-width: 150px;">
+        </div>
+        <ul>
+          <li id="menuProductos">
+            <a href="listaProductos.html" target="contentFrame">Productos</a>
+          </li>
+          <li id="menuEntradas">
+            <a
+              class="dropdown-toggle"
+              href="#"
+              data-bs-toggle="collapse"
+              data-bs-target="#submenuEntradas"
+              aria-expanded="false"
+            >
+              Entradas
+            </a>
+            <ul class="collapse submenu" id="submenuEntradas">
+              <li>
+                <a href="entradaMercaderia.html" target="contentFrame">Entrada Mercadería</a>
+              </li>
+              <li>
+                <a href="traslados.html" target="contentFrame">Traslados</a>
+              </li>
+              <li>
+                <a href="devolucion.html" target="contentFrame">Devolución</a>
+              </li>
+            </ul>
+          </li>
+          <li id="menuMovimientos">
+            <a
+              class="dropdown-toggle"
+              href="#"
+              data-bs-toggle="collapse"
+              data-bs-target="#submenuMovimientos"
+              aria-expanded="false"
+            >
+              Movimientos
+            </a>
+            <ul class="collapse submenu" id="submenuMovimientos">
+              <li>
+                <a href="realizarMovimiento.html" target="contentFrame">Realizar Movimiento</a>
+              </li>
+              <li>
+                <a href="historiasMovimientos.html" target="contentFrame">Historias de Movimientos</a>
+              </li>
+            </ul>
+          </li>
+          <li id="menuVentas">
+            <a
+              class="dropdown-toggle"
+              href="#"
+              data-bs-toggle="collapse"
+              data-bs-target="#submenuVentas"
+              aria-expanded="false"
+            >
+              Ventas
+            </a>
+            <ul class="collapse submenu" id="submenuVentas">
+              <li>
+                <a href="ventas.html" target="contentFrame">Ventas</a>
+              </li>
+              <li>
+                <a href="ventasHistorial.html" target="contentFrame">Ventas Historial</a>
+              </li>
+              <li>
+                <a href="cierre.html" target="contentFrame">Cierre</a>
+              </li>
+            </ul>
+          </li>
+          <li id="menuEmpleados">
+            <a href="empleados.html" target="contentFrame">Empleados</a>
+          </li>
+          <li id="menuUsuarios">
+            <a href="usuarios.html" target="contentFrame">
+              <i class="fa-solid fa-user"></i> Usuarios
+            </a>
+          </li>
+          <li id="menuTiendas">
+            <a href="tiendas.html" target="contentFrame">
+              <i class="fa-solid fa-store"></i> Tiendas
+            </a>
+          </li>
+        </ul>
+      </div>
+      <!-- Bloque de información del usuario al final del menú -->
+      <div class="user-info">
+        <span id="loggedUser"></span>
+        <span id="userStore"></span>
+        <button class="logout-btn" onclick="logout()" title="Cerrar sesión">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
+      </div>
+    </nav>
+
+    <!-- Contenedor principal: se carga el contenido en un iframe -->
+    <div id="content">
+      <iframe id="contentFrame" name="contentFrame" src="listaProductos.html"></iframe>
+    </div>
+
+    <!-- Bootstrap JS Bundle (incluye Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
+</html>
+>>>>>>> 2311f6942aa97d3ee0b300aed053c87966002159
