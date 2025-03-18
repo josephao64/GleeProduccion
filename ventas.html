@@ -1,4 +1,4 @@
-}<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
@@ -235,12 +235,12 @@
           loadStoreFilter();
           document.getElementById("storeSelect").addEventListener("change", function () {
             currentStore = this.value;
-            invTitle.textContent = currentStore ? `Inventario de: ${currentStore}` : "Inventario: Stock Total";
+            invTitle.textContent = currentStore ? Inventario de: ${currentStore} : "Inventario: Stock Total";
             listenProducts();
           });
         } else {
           currentStore = loggedUserStore;
-          invTitle.textContent = `Inventario de: ${currentStore}`;
+          invTitle.textContent = Inventario de: ${currentStore};
         }
         listenProducts();
         document.getElementById("searchInput").addEventListener("input", renderProducts);
@@ -304,7 +304,7 @@
           return matchSearch && matchSize;
         });
         if (filtered.length === 0) {
-          tbody.innerHTML = `<tr><td colspan="6" class="text-center">No hay productos con ese filtro</td></tr>`;
+          tbody.innerHTML = <tr><td colspan="6" class="text-center">No hay productos con ese filtro</td></tr>;
           return;
         }
         filtered.forEach(prod => {
@@ -360,7 +360,7 @@
         const { value: cantidad } = await Swal.fire({
           title: "Cantidad a Agregar",
           input: "number",
-          inputLabel: `Ingrese la cantidad (Stock disp: ${stockDisponible})`,
+          inputLabel: Ingrese la cantidad (Stock disp: ${stockDisponible}),
           inputAttributes: { min: 1, max: stockDisponible, step: 1 },
           inputValidator: (value) => {
             if (!value || value <= 0) return "Cantidad inválida";
@@ -474,7 +474,7 @@
                Cant: ${item.cantidad} x Q${item.precio.toFixed(2)} = Q${subt.toFixed(2)}</p>
           `;
         });
-        resumenHtml += `<h4>Venta Total: Q${totalVenta.toFixed(2)}</h4>`;
+        resumenHtml += <h4>Venta Total: Q${totalVenta.toFixed(2)}</h4>;
 
         let formData;
         if (saleCategory === "fisico") {
@@ -682,13 +682,13 @@
         doc.text("Comprobante de Venta", 10, y);
         y += lineHeight * 1.5;
         doc.setFontSize(12);
-        doc.text(`Venta ID: ${venta.idVenta}`, 10, y);
+        doc.text(Venta ID: ${venta.idVenta}, 10, y);
         y += lineHeight;
-        doc.text(`Fecha: ${new Date(venta.fecha).toLocaleString()}`, 10, y);
+        doc.text(Fecha: ${new Date(venta.fecha).toLocaleString()}, 10, y);
         y += lineHeight;
-        doc.text(`Cajero: ${venta.usuario}`, 10, y);
+        doc.text(Cajero: ${venta.usuario}, 10, y);
         y += lineHeight;
-        doc.text(`Vendedor: ${venta.empleadoNombre}`, 10, y);
+        doc.text(Vendedor: ${venta.empleadoNombre}, 10, y);
 
         // Datos del Cliente
         y += lineHeight * 1.5;
@@ -696,16 +696,16 @@
         doc.text("Datos del Cliente", 10, y);
         y += lineHeight;
         doc.setFontSize(12);
-        doc.text(`Nombre: ${venta.cliente.nombre}`, 10, y);
+        doc.text(Nombre: ${venta.cliente.nombre}, 10, y);
         y += lineHeight;
-        doc.text(`Teléfono: ${venta.cliente.telefono}`, 10, y);
+        doc.text(Teléfono: ${venta.cliente.telefono}, 10, y);
         if (venta.cliente.correo) {
           y += lineHeight;
-          doc.text(`Correo: ${venta.cliente.correo}`, 10, y);
+          doc.text(Correo: ${venta.cliente.correo}, 10, y);
         }
         if (venta.cliente.direccion) {
           y += lineHeight;
-          doc.text(`Dirección: ${venta.cliente.direccion}`, 10, y);
+          doc.text(Dirección: ${venta.cliente.direccion}, 10, y);
         }
 
         // Detalle de la Venta
@@ -719,7 +719,7 @@
             doc.addPage();
             y = 10;
           }
-          doc.text(`${index + 1}. ${prod.producto_nombre} (${prod.producto_codigo})`, 10, y);
+          doc.text(${index + 1}. ${prod.producto_nombre} (${prod.producto_codigo}), 10, y);
           y += lineHeight;
           doc.text(`   Cant: ${prod.cantidad} x Q${parseFloat(prod.precio_unitario || 0).toFixed(2)} = Q${parseFloat(prod.subtotal || 0).toFixed(2)}`, 10, y);
           y += lineHeight;
@@ -835,7 +835,7 @@
           cajaAbierta = true;
           idAperturaActivo = docRef.id;
           datosApertura = apertura;
-          Swal.fire("Caja Abierta", `Apertura registrada. Fondo: Q${montoApertura.toFixed(2)} (N° Apertura: ${idAperturaNum})`, "success");
+          Swal.fire("Caja Abierta", Apertura registrada. Fondo: Q${montoApertura.toFixed(2)} (N° Apertura: ${idAperturaNum}), "success");
         } catch (error) {
           Swal.fire("Error", error.message, "error");
         }
@@ -990,7 +990,7 @@
                   <td>Q ${Number(cierre.totalIngresado || 0).toFixed(2)}</td>`;
         let diffText = Number(cierre.diferencia || 0).toFixed(2);
         let diffColor = cierre.totalIngresado >= cierre.totalEfectivoSistema ? "green" : "red";
-        htmlReporte += `<td style="color: ${diffColor};">${diffText}</td>`;
+        htmlReporte += <td style="color: ${diffColor};">${diffText}</td>;
         htmlReporte += `
                 </tr>
               </tbody>
