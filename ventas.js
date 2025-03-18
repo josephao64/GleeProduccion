@@ -743,10 +743,12 @@ async function cerrarCaja() {
  * Generar Reporte de Cierre (HTML)
  *******************************************************/
 function generarReporteCierreHTML(ventas, cierre) {
-  // Determinar color para la diferencia: verde si arqueo >= totalEfectivoSistema, rojo de lo contrario
-  const colorDiferencia = (cierre.totalIngresado >= cierre.totalEfectivoSistema) ? "green" : "red";
-  // Usar la fecha ya formateada en cierre.fechaCierre (debe estar en formato dd/mm/yyyy)
-  const fechaFormateada = cierre.fechaCierre;
+  // Calcular diferencia: Diferencia = Arqueo - Total efectivo (donde Total efectivo = montoApertura + totalEfectivo)
+  // Aquí calculamos la diferencia según la fórmula indicada.
+  const diff = Number(cierre.totalIngresado || 0) - Number(cierre.totalEfectivoSistema || 0);
+  const colorDiferencia = diff >= 0 ? "green" : "red";
+  // Se formatea la fecha de cierre usando las funciones de parse y format (se asume que cierre.fechaCierre está en ISO o formato dd/mm/yyyy)
+  const fechaFormateada = cierre.fechaCierre ? formatDate(parseDate(cierre.fechaCierre)) : "Fecha no disponible";
 
   // Resumen de ventas por método
   const efectivo = Number(cierre.totalEfectivo || 0);
@@ -754,83 +756,103 @@ function generarReporteCierreHTML(ventas, cierre) {
   const transferencia = Number(cierre.totalTransferencia || 0);
   const enLinea = Number(cierre.ventaLinea || 0);
   const totalResumen = efectivo + tarjeta + transferencia + enLinea;
+  
+  // Total efectivo se calcula como: montoApertura + totalEfectivo
+  const totalEfectivoSistema = Number(cierre.totalEfectivoSistema || 0);
+  // Además, se mostrará junto al arqueo (totalIngresado) y la suma de ambos
+  const arqueo = Number(cierre.totalIngresado || 0);
+  const sumaTotalEfectivo = totalEfectivoSistema + arqueo;
 
   return `
-    <div class="container">
-      <!-- Encabezado -->
-      <div class="row mb-3">
-        <div class="col-md-6" style="text-align: left;">
-          <strong>ID Cierre:</strong> ${cierre.idCierre}<br>
-          <strong>Fecha de cierre:</strong> ${fechaFormateada}<br>
-          <strong>Lugar:</strong> ${cierre.usuario || "-"}
+    <div class="container" style="max-width: 900px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+      <!-- Encabezado en una sola línea -->
+      <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
+        <div style="text-align: left;">
+          <div><strong>ID Cierre:</strong> <span style="font-size: 1.2em;">${cierre.idCierre}</span></div>
+          <div><strong>Fecha de cierre:</strong> <span>${fechaFormateada}</span></div>
+          <div><strong>Hora:</strong> <span>${cierre.horaCierre || "-"}</span></div>
+          <div><strong>Lugar:</strong> <span>${cierre.usuario || "-"}</span></div>
         </div>
-        <div class="col-md-6" style="text-align: right;">
-          <strong>Monto de Apertura:</strong> Q ${Number(cierre.montoApertura || 0).toFixed(2)}
+        <div style="text-align: right;">
+          <div><strong>Monto de Apertura:</strong> <span style="font-size: 1.2em;">Q ${Number(cierre.montoApertura || 0).toFixed(2)}</span></div>
         </div>
       </div>
       
       <!-- Detalle de Ventas (Resumen) -->
-      <h5 class="mt-3">Detalle de Ventas</h5>
-      <table class="table table-bordered">
-        <thead class="table-light">
+      <h5 style="border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px;">Detalle de Ventas</h5>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <thead style="background-color: #f5f5f5;">
           <tr>
-            <th>Efectivo</th>
-            <th>Tarjeta</th>
-            <th>Transferencia</th>
-            <th>En línea</th>
-            <th>Total</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">Efectivo</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">Tarjeta</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">Transferencia</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">En línea</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">Total</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Q ${efectivo.toFixed(2)}</td>
-            <td>Q ${tarjeta.toFixed(2)}</td>
-            <td>Q ${transferencia.toFixed(2)}</td>
-            <td>Q ${enLinea.toFixed(2)}</td>
-            <td>Q ${totalResumen.toFixed(2)}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">Q ${efectivo.toFixed(2)}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">Q ${tarjeta.toFixed(2)}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">Q ${transferencia.toFixed(2)}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">Q ${enLinea.toFixed(2)}</td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">Q ${totalResumen.toFixed(2)}</td>
           </tr>
         </tbody>
       </table>
       
       <!-- Totales -->
-      <h5 class="mt-3">Totales</h5>
-      <table class="table table-bordered">
-        <thead class="table-light">
+      <h5 style="border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px;">Totales</h5>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+        <thead style="background-color: #f5f5f5;">
           <tr>
-            <th>Total efectivo</th>
-            <th>Arqueo</th>
-            <th>Diferencia</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">Total efectivo</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">Arqueo</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">Diferencia</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Q ${Number(cierre.totalEfectivoSistema || 0).toFixed(2)}</td>
-            <td>Q ${Number(cierre.totalIngresado || 0).toFixed(2)}</td>
-            <td><span style="color: ${colorDiferencia};">Q ${Number(cierre.diferencia || 0).toFixed(2)}</span></td>
+            <!-- Aquí se muestra el Total efectivo (montoApertura + totalEfectivo) y se le suma el Arqueo, visualizado como operación -->
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">
+              Q ${Number(totalEfectivoSistema).toFixed(2)} + Q ${Number(arqueo).toFixed(2)} = Q ${Number(sumaTotalEfectivo).toFixed(2)}
+            </td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">
+              Q ${Number(arqueo).toFixed(2)}
+            </td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">
+              <span style="color: ${colorDiferencia};">
+                ${diff >= 0 ? diff.toFixed(2) : "-" + Math.abs(diff).toFixed(2)}
+              </span>
+            </td>
           </tr>
         </tbody>
       </table>
       
       <!-- Ventas Detalladas -->
-      <h5 class="mt-3">Ventas Detalladas</h5>
-      <table class="table table-bordered">
-        <thead class="table-light">
+      <h5 style="border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px;">Ventas Detalladas</h5>
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead style="background-color: #f5f5f5;">
           <tr>
-            <th>Id venta</th>
-            <th>Método de pago</th>
-            <th>N° Referencia</th>
-            <th>Monto</th>
-            <th>Vendedor</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">Id venta</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">Método de pago</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">N° Referencia</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">Monto</th>
+            <th style="border: 1px solid #ddd; padding: 8px;">Vendedor</th>
           </tr>
         </thead>
         <tbody>
           ${ventas.length > 0 ? ventas.map((v, index) => `
             <tr>
-              <td>${v.idVenta || index + 1}</td>
-              <td>${v.metodo_pago || "-"}</td>
-              <td>${(v.metodo_pago && v.metodo_pago.trim().toLowerCase() === "transferencia") ? (v.numeroTransferencia || "-") : "-"}</td>
-              <td>Q ${Number(v.total || 0).toFixed(2)}</td>
-              <td>${v.empleadoNombre || "-"}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${v.idVenta || index + 1}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${v.metodo_pago || "-"}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${
+                (v.metodo_pago && v.metodo_pago.trim().toLowerCase() === "transferencia")
+                  ? (v.numeroTransferencia || "-")
+                  : "-"
+              }</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">Q ${Number(v.total || 0).toFixed(2)}</td>
+              <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${v.empleadoNombre || "-"}</td>
             </tr>
           `).join("") : `<tr><td colspan="5" class="text-center">No se encontraron ventas</td></tr>`}
         </tbody>
