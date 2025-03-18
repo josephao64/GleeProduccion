@@ -589,89 +589,10 @@ async function procesarVenta() {
     Swal.fire("Error", error.toString(), "error");
   }
 }
-
 /*******************************************************
- * Descargar Comprobante PDF
+ * Descargar comprobante
  *******************************************************/
-function descargarComprobante(venta) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  let y = 10;
-  const lineHeight = 10;
-  
-  // Encabezado
-  doc.setFontSize(16);
-  doc.text("Comprobante de Venta", 10, y);
-  
-  y += lineHeight * 1.5;
-  doc.setFontSize(12);
-  doc.text(`Venta ID: ${venta.idVenta}`, 10, y);
-  y += lineHeight;
-  doc.text(`Fecha: ${new Date(venta.fecha).toLocaleString()}`, 10, y);
-  y += lineHeight;
-  doc.text(`Cajero: ${venta.usuario}`, 10, y);
-  y += lineHeight;
-  doc.text(`Empleado: ${venta.empleadoNombre}`, 10, y);
-  
-  // Datos del Cliente
-  y += lineHeight * 1.5;
-  doc.setFontSize(14);
-  doc.text("Datos del Cliente", 10, y);
-  y += lineHeight;
-  doc.setFontSize(12);
-  doc.text(`Nombre: ${venta.cliente.nombre}`, 10, y);
-  y += lineHeight;
-  doc.text(`Teléfono: ${venta.cliente.telefono}`, 10, y);
-  if (venta.cliente.correo) {
-    y += lineHeight;
-    doc.text(`Correo: ${venta.cliente.correo}`, 10, y);
-  }
-  if (venta.cliente.direccion) {
-    y += lineHeight;
-    doc.text(`Dirección: ${venta.cliente.direccion}`, 10, y);
-  }
-  
-  // Detalle de la Venta
-  y += lineHeight * 1.5;
-  doc.setFontSize(14);
-  doc.text("Detalle de la Venta", 10, y);
-  y += lineHeight;
-  doc.setFontSize(12);
-  venta.productos.forEach((prod, index) => {
-    if (y > 270) {
-      doc.addPage();
-      y = 10;
-    }
-    doc.text(`${index + 1}. ${prod.producto_nombre} (${prod.producto_codigo})`, 10, y);
-    y += lineHeight;
-    doc.text(`   Cant: ${prod.cantidad} x Q${parseFloat(prod.precio_unitario || 0).toFixed(2)} = Q${parseFloat(prod.subtotal || 0).toFixed(2)}`, 10, y);
-    y += lineHeight;
-  });
-  
-  // Sumarios
-  const fondoApertura = Number(datosApertura.montoApertura || 0);
-  const ventaEfectivo = venta.metodo_pago.toLowerCase() === "efectivo" ? Number(venta.total || 0) : 0;
-  const totalEfectivoSistema = fondoApertura + ventaEfectivo;
-  const totalIngresado = venta.metodo_pago.toLowerCase() === "efectivo" ? Number(venta.total || 0) : Number(venta.total || 0);
-  const diferencia = totalEfectivoSistema - totalIngresado;
-  
-  y += lineHeight * 1.5;
-  doc.text(`VENTA TOTAL: Q${Number(venta.total || 0).toFixed(2)}`, 10, y);
-  y += lineHeight;
-  doc.text(`TOTAL EFECTIVO (Sistema): Q${totalEfectivoSistema.toFixed(2)}`, 10, y);
-  y += lineHeight;
-  doc.text(`TOTAL INGRESADO (Cajero): Q${totalIngresado.toFixed(2)}`, 10, y);
-  y += lineHeight;
-  doc.text(`DIFERENCIA: Q${diferencia.toFixed(2)}`, 10, y);
-  y += lineHeight;
-  doc.text(`Método de Pago: ${venta.metodo_pago}`, 10, y);
-  if (venta.metodo_pago.toLowerCase() === "efectivo") {
-    y += lineHeight;
-    doc.text(`Cambio: Q${Number(venta.cambio || 0).toFixed(2)}`, 10, y);
-  }
-  
-  doc.output("dataurlnewwindow");
-}
+
 
 /*******************************************************
  * Apertura y Cierre de Caja (Persistente en BD)
