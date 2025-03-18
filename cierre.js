@@ -56,6 +56,7 @@ async function cargarCierres() {
 
   tablaCierres.draw();
 }
+
 window.verDetalleCierre = async function (cierreId) {
   console.log("Buscando cierre con id:", cierreId);
   const cierreDoc = await getDoc(doc(db, "cierres", cierreId));
@@ -71,6 +72,9 @@ window.verDetalleCierre = async function (cierreId) {
     console.error("El cierre no tiene idApertura asignado:", cierre);
     return Swal.fire("Error", "El cierre no tiene ID de apertura asociado.", "error");
   }
+  
+  // Convertir la fecha a formato dd/mm/yyyy
+  const fechaFormateada = new Date(cierre.fechaCierre).toLocaleDateString("es-ES");
 
   // Consultar las ventas asociadas al idApertura del cierre
   const ventasQuery = query(
@@ -86,21 +90,27 @@ window.verDetalleCierre = async function (cierreId) {
       totalTransferencia = 0,
       totalLinea = 0;
   let ventasDetalle = "";
-
+  // Construir el detalle de ventas con la columna Número de referencia
   ventasSnapshot.forEach((v, index) => {
     const venta = v.data();
     const monto = Number(venta.total || 0);
     const metodo = venta.metodo_pago?.toLowerCase();
-
+    
     if (metodo === "efectivo") totalEfectivo += monto;
     else if (metodo === "tarjeta") totalTarjeta += monto;
     else if (metodo === "transferencia") totalTransferencia += monto;
     else if (metodo === "en línea" || metodo === "en linea") totalLinea += monto;
 
+    let referencia = "-";
+    if (metodo === "tarjeta" || metodo === "transferencia" || metodo === "en línea" || metodo === "en linea") {
+      referencia = venta.numeroReferencia || "-";
+    }
+    
     ventasDetalle += `
       <tr>
         <td>${venta.idVenta || index + 1}</td>
         <td>${venta.metodo_pago || '-'}</td>
+        <td>${referencia}</td>
         <td>Q ${monto.toFixed(2)}</td>
         <td>${venta.empleadoNombre || '-'}</td>
       </tr>`;
@@ -114,23 +124,29 @@ window.verDetalleCierre = async function (cierreId) {
 
   const detalleHTML = `
     <div>
-      <div style="display: flex; justify-content: space-between;">
+      <!-- Encabezado: Izquierda (alineado a la izquierda): ID Cierre, Fecha, Hora, Lugar. Derecha: Monto de Apertura -->
+      <div style="display: flex; justify-content: space-between; margin-bottom: 1rem;">
+        <div style="text-align: left;">
+          <strong>ID Cierre:</strong> ${cierreId}<br>
+          <strong>Fecha:</strong> ${fechaFormateada}<br>
+          <strong>Hora:</strong> ${cierre.horaCierre || '-'}<br>
+          <strong>Lugar:</strong> ${cierre.usuario || '-'}
+        </div>
         <div>
           <strong>Monto de Apertura:</strong> Q ${Number(cierre.montoApertura || 0).toFixed(2)}
         </div>
-        <div>
-          <strong>Fecha:</strong> ${cierre.fechaCierre} ${cierre.horaCierre || ''}<br>
-          <strong>Lugar:</strong> ${cierre.usuario}
-        </div>
       </div>
+      
+      <!-- Resumen de Ventas con venta total en una misma tabla -->
       <h5 class="mt-3">Resumen de Ventas</h5>
       <table class="table table-bordered">
         <thead>
           <tr>
-            <th>Venta Efectivo</th>
-            <th>Venta Tarjeta</th>
-            <th>Venta Transferencia</th>
-            <th>Venta en Línea</th>
+            <th>Efectivo</th>
+            <th>Tarjeta</th>
+            <th>Transferencia</th>
+            <th>Línea</th>
+            <th>Total</th>
           </tr>
         </thead>
         <tbody>
@@ -139,27 +155,18 @@ window.verDetalleCierre = async function (cierreId) {
             <td>Q ${totalTarjeta.toFixed(2)}</td>
             <td>Q ${totalTransferencia.toFixed(2)}</td>
             <td>Q ${totalLinea.toFixed(2)}</td>
-          </tr>
-        </tbody>
-      </table>
-      <table class="table table-bordered">
-        <thead>
-          <tr>
-            <th>Venta Total</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
             <td>Q ${(totalEfectivo + totalTarjeta + totalTransferencia + totalLinea).toFixed(2)}</td>
           </tr>
         </tbody>
       </table>
+      
+      <!-- Totales -->
       <h5 class="mt-3">Totales</h5>
       <table class="table table-bordered">
         <thead>
           <tr>
-            <th>Total Efectivo (Sistema)</th>
-            <th>Total Ingresado (Arqueo Físico)</th>
+            <th>Total efectivo</th>
+            <th>Arqueo</th>
             <th>Diferencia</th>
           </tr>
         </thead>
@@ -171,10 +178,21 @@ window.verDetalleCierre = async function (cierreId) {
           </tr>
         </tbody>
       </table>
+      
+      <!-- Ventas Detalladas -->
       <h5 class="mt-3">Ventas Detalladas</h5>
       <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Id venta</th>
+            <th>Método de pago</th>
+            <th>Número de referencia</th>
+            <th>Monto</th>
+            <th>Vendedor</th>
+          </tr>
+        </thead>
         <tbody>
-          ${ventasDetalle || '<tr><td colspan="4">No se encontraron ventas</td></tr>'}
+          ${ventasDetalle || '<tr><td colspan="5">No se encontraron ventas</td></tr>'}
         </tbody>
       </table>
     </div>`;
@@ -182,6 +200,12 @@ window.verDetalleCierre = async function (cierreId) {
   Swal.fire({ title: "Detalle del Cierre", html: detalleHTML, width: "90%" });
 };
 
+window.anularCierre = async (id) => {
+  await updateDoc(doc(db, "cierres", id), { estado: "ANULADA" });
+  cargarCierres();
+};
 
-window.anularCierre = async (id) => { await updateDoc(doc(db, "cierres", id), { estado: "ANULADA" }); cargarCierres(); };
-window.eliminarCierre = async (id) => { await deleteDoc(doc(db, "cierres", id)); cargarCierres(); };
+window.eliminarCierre = async (id) => {
+  await deleteDoc(doc(db, "cierres", id));
+  cargarCierres();
+};
