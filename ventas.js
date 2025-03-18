@@ -33,7 +33,7 @@ let datosCliente = {};
 // Variables para control de caja
 let cajaAbierta = false;
 let idAperturaActivo = null;
-let montoApertura = 0; // Monto de apertura en número entero
+let montoApertura = 0;
 let datosApertura = {};
 
 // Gestión de usuario y tienda
@@ -52,6 +52,16 @@ function generarIdCorto() {
 }
 function generarIdVentaCorta() {
   return Math.floor(Math.random() * 9000) + 1000;
+}
+
+/*******************************************************
+ * Formatear Fecha a dd/mm/yyyy
+ *******************************************************/
+function formatDate(date) {
+  const d = date.getDate().toString().padStart(2, "0");
+  const m = (date.getMonth() + 1).toString().padStart(2, "0");
+  const y = date.getFullYear();
+  return `${d}/${m}/${y}`;
 }
 
 /*******************************************************
@@ -128,7 +138,6 @@ async function checkCajaAbierta() {
  *******************************************************/
 document.addEventListener("DOMContentLoaded", async () => {
   await checkCajaAbierta();
-
   const invTitle = document.getElementById("inventoryTitle");
   if (isAdmin) {
     document.getElementById("adminStoreFilter").style.display = "block";
@@ -240,7 +249,6 @@ function renderProducts() {
         row.classList.remove("table-active")
       );
       tr.classList.add("table-active");
-      selectedProductId = prod.id;
     });
     tr.querySelector("button").addEventListener("click", (e) => {
       e.stopPropagation();
@@ -329,9 +337,6 @@ function renderCart() {
 
 /*******************************************************
  * Procesar Venta
- * - Se solicita primero el tipo de venta (Física o en Línea).
- * - Luego se solicita el código del empleado (3 caracteres) para registrar quién realizó la venta.
- * - Dependiendo del tipo, se solicitan datos adicionales.
  *******************************************************/
 async function procesarVenta() {
   if (!cajaAbierta || !idAperturaActivo) {
@@ -342,8 +347,10 @@ async function procesarVenta() {
     Swal.fire("Carrito vacío", "", "warning");
     return;
   }
-  
-  // Preguntar el tipo de venta: Física o en Línea
+  if (isAdmin && !currentStore) {
+    Swal.fire("Error", "Seleccione una tienda para descontar stock.", "error");
+    return;
+  }
   const { value: saleCategory } = await Swal.fire({
     title: "Tipo de Venta",
     input: "radio",
@@ -356,8 +363,7 @@ async function procesarVenta() {
     }
   });
   if (!saleCategory) return;
-  
-  // Solicitar el código del empleado (3 caracteres)
+
   const { value: empCodigo } = await Swal.fire({
     title: "Código del Empleado",
     input: "text",
@@ -374,10 +380,9 @@ async function procesarVenta() {
     }
   });
   if (!empCodigo) return;
-  
-  // Obtener el nombre del empleado según el código
+
   const empNombre = await getEmployeeName(empCodigo);
-  
+
   let totalVenta = parseFloat(document.getElementById("totalVenta").textContent) || 0;
   let resumenHtml = "";
   cart.forEach(item => {
@@ -388,10 +393,9 @@ async function procesarVenta() {
     `;
   });
   resumenHtml += `<h4>Venta Total: Q${totalVenta.toFixed(2)}</h4>`;
-  
+
   let formData;
   if (saleCategory === "fisico") {
-    // Venta física: solicitar datos del cliente y método de pago
     const result = await Swal.fire({
       title: "Procesar Venta - Física",
       html: `
@@ -412,7 +416,7 @@ async function procesarVenta() {
           <input type="number" id="montoRecibido" class="swal2-input" value="${totalVenta}" placeholder="Monto recibido (Q)">
         </div>
         <div id="numeroTransferenciaContainer" style="display: none;">
-          <input type="text" id="numeroTransferencia" class="swal2-input" placeholder="Número de Transferencia">
+          <input type="text" id="numeroTransferencia" class="swal2-input" placeholder="Número de Referencia">
         </div>
       `,
       focusConfirm: false,
@@ -447,7 +451,7 @@ async function procesarVenta() {
         if (metodo === "Transferencia") {
           let numTransferencia = document.getElementById("numeroTransferencia").value.trim();
           if (!numTransferencia) {
-            Swal.showValidationMessage("Ingrese el número de transferencia");
+            Swal.showValidationMessage("Ingrese el número de Referencia");
             return;
           }
           pagoObj.numeroTransferencia = numTransferencia;
@@ -474,7 +478,6 @@ async function procesarVenta() {
     });
     formData = result.value;
   } else {
-    // Venta en línea: solicitar datos del cliente, comprobante de pago y comentario
     const result = await Swal.fire({
       title: "Procesar Venta - En Línea",
       html: `
@@ -524,9 +527,9 @@ async function procesarVenta() {
   }
   if (!formData) return;
   
-  // Construir la venta, incluyendo el nombre del empleado
+  // Construir la venta
   let venta = {
-    idVenta: ventaId,
+    idVenta: generarIdVentaCorta(),
     fecha: new Date().toISOString(),
     cliente: formData.clienteData,
     productos: cart.map(item => ({
@@ -541,12 +544,12 @@ async function procesarVenta() {
     metodo_pago: formData.pagoObj.metodo,
     cambio: formData.pagoObj.cambio || 0,
     usuario: usuarioActual,
-    // Usamos el número incremental almacenado en datosApertura:
-    idApertura: datosApertura.idApertura,
-    empleadoNombre: empNombre
+    idApertura: idAperturaActivo,
+    empleadoNombre: empNombre,
+    numeroTransferencia: formData.pagoObj.numeroTransferencia || ""
   };
   
-  // Actualizar el stock de los productos mediante un batch
+  // Actualizar el stock mediante batch
   const batch = writeBatch(db);
   for (let item of cart) {
     let prodRef = doc(db, "productos", item.productId);
@@ -554,11 +557,9 @@ async function procesarVenta() {
     if (prodSnap.exists()) {
       let prodData = prodSnap.data();
       if (prodData.stock && typeof prodData.stock === "object") {
-        if (isAdmin) {
-          if (currentStore) {
-            let stActual = prodData.stock[currentStore] || 0;
-            prodData.stock[currentStore] = stActual - item.cantidad;
-          }
+        if (isAdmin && currentStore) {
+          let stActual = prodData.stock[currentStore] || 0;
+          prodData.stock[currentStore] = stActual - item.cantidad;
         } else {
           let stActual = prodData.stock[currentStore] || 0;
           prodData.stock[currentStore] = stActual - item.cantidad;
@@ -573,6 +574,7 @@ async function procesarVenta() {
   batch.set(ventaRef, venta);
   try {
     await batch.commit();
+    // Mostrar el reporte de cierre en un modal propio (sin redirigir)
     Swal.fire({
       title: "Venta procesada!",
       html: `
@@ -591,89 +593,6 @@ async function procesarVenta() {
 }
 
 /*******************************************************
- * Descargar Comprobante PDF
- *******************************************************/
-function descargarComprobante(venta) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  let y = 10;
-  const lineHeight = 10;
-  
-  // Encabezado
-  doc.setFontSize(16);
-  doc.text("Comprobante de Venta", 10, y);
-  
-  y += lineHeight * 1.5;
-  doc.setFontSize(12);
-  doc.text(`Venta ID: ${venta.idVenta}`, 10, y);
-  y += lineHeight;
-  doc.text(`Fecha: ${new Date(venta.fecha).toLocaleString()}`, 10, y);
-  y += lineHeight;
-  doc.text(`Cajero: ${venta.usuario}`, 10, y);
-  y += lineHeight;
-  doc.text(`Empleado: ${venta.empleadoNombre}`, 10, y);
-  
-  // Datos del Cliente
-  y += lineHeight * 1.5;
-  doc.setFontSize(14);
-  doc.text("Datos del Cliente", 10, y);
-  y += lineHeight;
-  doc.setFontSize(12);
-  doc.text(`Nombre: ${venta.cliente.nombre}`, 10, y);
-  y += lineHeight;
-  doc.text(`Teléfono: ${venta.cliente.telefono}`, 10, y);
-  if (venta.cliente.correo) {
-    y += lineHeight;
-    doc.text(`Correo: ${venta.cliente.correo}`, 10, y);
-  }
-  if (venta.cliente.direccion) {
-    y += lineHeight;
-    doc.text(`Dirección: ${venta.cliente.direccion}`, 10, y);
-  }
-  
-  // Detalle de la Venta
-  y += lineHeight * 1.5;
-  doc.setFontSize(14);
-  doc.text("Detalle de la Venta", 10, y);
-  y += lineHeight;
-  doc.setFontSize(12);
-  venta.productos.forEach((prod, index) => {
-    if (y > 270) {
-      doc.addPage();
-      y = 10;
-    }
-    doc.text(`${index + 1}. ${prod.producto_nombre} (${prod.producto_codigo})`, 10, y);
-    y += lineHeight;
-    doc.text(`   Cant: ${prod.cantidad} x Q${parseFloat(prod.precio_unitario || 0).toFixed(2)} = Q${parseFloat(prod.subtotal || 0).toFixed(2)}`, 10, y);
-    y += lineHeight;
-  });
-  
-  // Sumarios
-  const fondoApertura = Number(datosApertura.montoApertura || 0);
-  const ventaEfectivo = venta.metodo_pago.toLowerCase() === "efectivo" ? Number(venta.total || 0) : 0;
-  const totalEfectivoSistema = fondoApertura + ventaEfectivo;
-  const totalIngresado = venta.metodo_pago.toLowerCase() === "efectivo" ? Number(venta.total || 0) : Number(venta.total || 0);
-  const diferencia = totalEfectivoSistema - totalIngresado;
-  
-  y += lineHeight * 1.5;
-  doc.text(`VENTA TOTAL: Q${Number(venta.total || 0).toFixed(2)}`, 10, y);
-  y += lineHeight;
-  doc.text(`TOTAL EFECTIVO (Sistema): Q${totalEfectivoSistema.toFixed(2)}`, 10, y);
-  y += lineHeight;
-  doc.text(`TOTAL INGRESADO (Cajero): Q${totalIngresado.toFixed(2)}`, 10, y);
-  y += lineHeight;
-  doc.text(`DIFERENCIA: Q${diferencia.toFixed(2)}`, 10, y);
-  y += lineHeight;
-  doc.text(`Método de Pago: ${venta.metodo_pago}`, 10, y);
-  if (venta.metodo_pago.toLowerCase() === "efectivo") {
-    y += lineHeight;
-    doc.text(`Cambio: Q${Number(venta.cambio || 0).toFixed(2)}`, 10, y);
-  }
-  
-  doc.output("dataurlnewwindow");
-}
-
-/*******************************************************
  * Apertura y Cierre de Caja (Persistente en BD)
  *******************************************************/
 async function abrirCaja() {
@@ -681,7 +600,6 @@ async function abrirCaja() {
     Swal.fire("Error", "La caja ya está abierta.", "warning");
     return;
   }
-  // Obtener el número de apertura incremental
   const nextAperturaId = await getNextAperturaId();
   const { value: monto } = await Swal.fire({
     title: "Abrir Caja",
@@ -694,17 +612,16 @@ async function abrirCaja() {
     }
   });
   if (!monto) return;
-  // Convertir el monto a entero
   montoApertura = parseInt(monto);
   let now = new Date();
   let fecha = now.toISOString().split("T")[0];
   let hora = now.toTimeString().split(" ")[0];
-  let idApertura = nextAperturaId; // Número incremental
+  let idApertura = nextAperturaId; // Ejemplo: 29845
   let apertura = {
-    idApertura, // Valor entero
+    idApertura, // Número incremental
     fechaApertura: fecha,
     horaApertura: hora,
-    montoApertura, // Se almacena el monto de apertura
+    montoApertura,
     usuario: usuarioActual,
     activo: true
   };
@@ -712,8 +629,8 @@ async function abrirCaja() {
     const docRef = await addDoc(collection(db, "aperturas"), apertura);
     cajaAbierta = true;
     idAperturaActivo = docRef.id;
-    datosApertura = apertura; // Asegurarse de guardar el monto de apertura
-    Swal.fire("Caja Abierta", `Apertura registrada. Fondo: Q${montoApertura.toFixed(2)} (N° Apertura: ${idApertura})`, "success");
+    datosApertura = apertura;
+    Swal.fire("Caja Abierta", `Apertura registrada. Fondo: Q ${montoApertura.toFixed(2)} (N° Apertura: ${idApertura})`, "success");
   } catch (error) {
     Swal.fire("Error", error.message, "error");
   }
@@ -724,7 +641,8 @@ async function cerrarCaja() {
     Swal.fire("Error", "No hay una apertura activa", "warning");
     return;
   }
-  let fechaHoy = new Date().toISOString().split("T")[0];
+  // Obtener la fecha actual en formato dd/mm/yyyy
+  let fechaHoy = formatDate(new Date());
   const { value: formCierre } = await Swal.fire({
     title: "Cerrar Caja",
     html: `
@@ -749,56 +667,71 @@ async function cerrarCaja() {
   );
   try {
     const snap = await getDocs(qVentas);
-    let totalEfectivo = 0;
-    let totalTarjeta = 0;
-    let totalTransferencia = 0;
+    let totalEfectivo = 0, totalTarjeta = 0, totalTransferencia = 0, ventaLinea = 0;
     let ventasDetalle = [];
     snap.forEach(docSnap => {
       let venta = docSnap.data();
-      if (venta.metodo_pago?.toLowerCase() === "efectivo") {
+      let metodo = venta.metodo_pago.toLowerCase();
+      if (metodo === "efectivo") {
         totalEfectivo += Number(venta.total || 0);
-      } else if (venta.metodo_pago?.toLowerCase() === "tarjeta") {
+      } else if (metodo === "tarjeta") {
         totalTarjeta += Number(venta.total || 0);
-      } else if (venta.metodo_pago?.toLowerCase() === "transferencia") {
+      } else if (metodo === "transferencia") {
         totalTransferencia += Number(venta.total || 0);
+      } else if (metodo === "en línea" || metodo === "en linea") {
+        ventaLinea += Number(venta.total || 0);
       }
       ventasDetalle.push(venta);
     });
-    let totalGeneral = totalEfectivo + totalTarjeta + totalTransferencia;
-    // TOTAL EFECTIVO (Sistema): Fondo de Apertura + Ventas en Efectivo
+    let totalGeneral = totalEfectivo + totalTarjeta + totalTransferencia + ventaLinea;
     const totalEfectivoSistema = Number(montoApertura) + totalEfectivo;
-    // TOTAL INGRESADO (Cajero): se toma del monto final ingresado
     const totalIngresado = montoFinal;
-    const diferencia = totalEfectivoSistema - totalIngresado;
+    const diferencia = totalIngresado - totalEfectivoSistema;
     let now = new Date();
     let horaCierre = now.toTimeString().split(" ")[0];
+    // Generar idReporteCierre (número)
+    let idReporteCierre = generarIdCorto();
     let cierreData = {
-      // Se usa el valor incremental de apertura en lugar del Firestore doc ID
+      idCierre: datosApertura.idApertura, // Usamos el número de apertura
+      idReporteCierre, // Nuevo campo para el reporte
       idApertura: datosApertura.idApertura,
+      idAperturaNum: datosApertura.idApertura || 0,
       fechaApertura: datosApertura.fechaApertura,
       horaApertura: datosApertura.horaApertura,
       fechaCierre: fechaHoy,
       horaCierre,
-      montoApertura: datosApertura.montoApertura, // Fondo de apertura
+      lugar: currentStore || "Local",
+      montoApertura: datosApertura.montoApertura,
       totalEfectivo,
       totalTarjeta,
       totalTransferencia,
+      ventaLinea,
       totalGeneral,
       totalEfectivoSistema,
       totalIngresado,
       diferencia,
       usuario: usuarioActual
     };
-    
-    // Marcar la apertura como cerrada
+
     await updateDoc(doc(db, "aperturas", idAperturaActivo), { activo: false });
-    // Registrar el cierre
     await addDoc(collection(db, "cierres"), cierreData);
+
+    // Generar el reporte HTML con el nuevo formato
+    const reporteHtml = generarReporteCierreHTML(ventasDetalle, cierreData);
+    // Guardar el reporte en la colección "reporteCierre"
+    await addDoc(collection(db, "reporteCierre"), {
+      idReporteCierre,
+      report: reporteHtml,
+      fechaCierre: cierreData.fechaCierre,
+      createdAt: new Date().toISOString()
+    });
+
     cajaAbierta = false;
     idAperturaActivo = null;
+    // Mostrar el reporte en el mismo modal sin redirigir
     Swal.fire({
       title: "Cierre Registrado",
-      html: generarReporteCierreHTML(ventasDetalle, cierreData),
+      html: reporteHtml,
       width: "80%"
     });
   } catch (error) {
@@ -806,73 +739,104 @@ async function cerrarCaja() {
   }
 }
 
-
+/*******************************************************
+ * Generar Reporte de Cierre (HTML)
+ *******************************************************/
 function generarReporteCierreHTML(ventas, cierre) {
-  let htmlReporte = `
+  // Determinar color para la diferencia: verde si arqueo >= totalEfectivoSistema, rojo de lo contrario
+  const colorDiferencia = (cierre.totalIngresado >= cierre.totalEfectivoSistema) ? "green" : "red";
+  // Usar la fecha ya formateada en cierre.fechaCierre (debe estar en formato dd/mm/yyyy)
+  const fechaFormateada = cierre.fechaCierre;
+
+  // Resumen de ventas por método
+  const efectivo = Number(cierre.totalEfectivo || 0);
+  const tarjeta = Number(cierre.totalTarjeta || 0);
+  const transferencia = Number(cierre.totalTransferencia || 0);
+  const enLinea = Number(cierre.ventaLinea || 0);
+  const totalResumen = efectivo + tarjeta + transferencia + enLinea;
+
+  return `
     <div class="container">
+      <!-- Encabezado -->
       <div class="row mb-3">
-        <div class="col-md-3 summary-box">
-          <strong>Num. Apertura:</strong> ${cierre.idApertura}
+        <div class="col-md-6" style="text-align: left;">
+          <strong>ID Cierre:</strong> ${cierre.idCierre}<br>
+          <strong>Fecha de cierre:</strong> ${fechaFormateada}<br>
+          <strong>Lugar:</strong> ${cierre.usuario || "-"}
         </div>
-        <div class="col-md-3 summary-box">
-          <strong>Cajero:</strong> ${cierre.usuario}
-        </div>
-        <div class="col-md-3 summary-box">
-          <strong>Fecha Apertura:</strong> ${cierre.fechaApertura} ${cierre.horaApertura}
-        </div>
-        <div class="col-md-3 summary-box">
-          <strong>Fecha Cierre:</strong> ${cierre.fechaCierre} ${cierre.horaCierre}
+        <div class="col-md-6" style="text-align: right;">
+          <strong>Monto de Apertura:</strong> Q ${Number(cierre.montoApertura || 0).toFixed(2)}
         </div>
       </div>
-      <div class="row mb-3">
-        <div class="col-md-4 summary-box bg-light">
-          <strong>Fondo Apertura:</strong> Q ${Number(cierre.montoApertura || 0).toFixed(2)}
-        </div>
-        <div class="col-md-4 summary-box bg-light">
-          <strong>Venta Efectivo:</strong> Q ${Number(cierre.totalEfectivo || 0).toFixed(2)}
-        </div>
-        <div class="col-md-4 summary-box bg-light">
-          <strong>VENTA TOTAL:</strong> Q ${Number(cierre.totalGeneral || 0).toFixed(2)}
-        </div>
-      </div>
-      <div class="row mb-3">
-        <div class="col-md-6 summary-box bg-light">
-          <strong>TOTAL EFECTIVO (Sistema):</strong> Q ${Number(cierre.totalEfectivoSistema || 0).toFixed(2)}
-        </div>
-        <div class="col-md-6 summary-box bg-light">
-          <strong>TOTAL INGRESADO (Cajero):</strong> Q ${Number(cierre.totalIngresado || 0).toFixed(2)}
-        </div>
-      </div>
-      <div class="row mb-3">
-        <div class="col-md-12 summary-box bg-light">
-          <strong>DIFERENCIA:</strong> Q ${Number(cierre.diferencia || 0).toFixed(2)}
-        </div>
-      </div>
-      <h4>Detalles de Operaciones</h4>
+      
+      <!-- Detalle de Ventas (Resumen) -->
+      <h5 class="mt-3">Detalle de Ventas</h5>
       <table class="table table-bordered">
-        <thead>
+        <thead class="table-light">
           <tr>
-            <th>N° Documento</th>
-            <th>Forma de Pago</th>
-            <th>Monto Pagado</th>
-            <th>Empleado</th>
+            <th>Efectivo</th>
+            <th>Tarjeta</th>
+            <th>Transferencia</th>
+            <th>En línea</th>
+            <th>Total</th>
           </tr>
         </thead>
-        <tbody>`;
-  ventas.forEach((v, index) => {
-    htmlReporte += `
+        <tbody>
           <tr>
-            <td>${v.idVenta || index + 1}</td>
-            <td>${v.metodo_pago || "-"}</td>
-            <td>Q ${Number(v.total || 0).toFixed(2)}</td>
-            <td>${v.empleadoNombre || "-"}</td>
-          </tr>`;
-  });
-  htmlReporte += `
+            <td>Q ${efectivo.toFixed(2)}</td>
+            <td>Q ${tarjeta.toFixed(2)}</td>
+            <td>Q ${transferencia.toFixed(2)}</td>
+            <td>Q ${enLinea.toFixed(2)}</td>
+            <td>Q ${totalResumen.toFixed(2)}</td>
+          </tr>
         </tbody>
       </table>
-    </div>`;
-  return htmlReporte;
+      
+      <!-- Totales -->
+      <h5 class="mt-3">Totales</h5>
+      <table class="table table-bordered">
+        <thead class="table-light">
+          <tr>
+            <th>Total efectivo</th>
+            <th>Arqueo</th>
+            <th>Diferencia</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Q ${Number(cierre.totalEfectivoSistema || 0).toFixed(2)}</td>
+            <td>Q ${Number(cierre.totalIngresado || 0).toFixed(2)}</td>
+            <td><span style="color: ${colorDiferencia};">Q ${Number(cierre.diferencia || 0).toFixed(2)}</span></td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <!-- Ventas Detalladas -->
+      <h5 class="mt-3">Ventas Detalladas</h5>
+      <table class="table table-bordered">
+        <thead class="table-light">
+          <tr>
+            <th>Id venta</th>
+            <th>Método de pago</th>
+            <th>N° Referencia</th>
+            <th>Monto</th>
+            <th>Vendedor</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${ventas.length > 0 ? ventas.map((v, index) => `
+            <tr>
+              <td>${v.idVenta || index + 1}</td>
+              <td>${v.metodo_pago || "-"}</td>
+              <td>${(v.metodo_pago && v.metodo_pago.trim().toLowerCase() === "transferencia") ? (v.numeroTransferencia || "-") : "-"}</td>
+              <td>Q ${Number(v.total || 0).toFixed(2)}</td>
+              <td>${v.empleadoNombre || "-"}</td>
+            </tr>
+          `).join("") : `<tr><td colspan="5" class="text-center">No se encontraron ventas</td></tr>`}
+        </tbody>
+      </table>
+    </div>
+  `;
 }
 
 /*******************************************************
@@ -911,5 +875,49 @@ window.procesarVenta = procesarVenta;
 window.cerrarCaja = cerrarCaja;
 window.descargarComprobante = descargarComprobante;
 
-// Iniciar el sistema
 initSistemaVenta();
+
+
+/*******************************************************
+ * Exponer funciones globalmente
+ *******************************************************/
+window.descargarReportePDF = descargarReportePDF;
+
+// Función para descargar el reporte PDF usando html2canvas
+async function descargarReportePDF(idReporteCierre) {
+  const idReporteNum = Number(idReporteCierre);
+  const reporteQuery = query(
+    collection(db, "reporteCierre"),
+    where("idReporteCierre", "==", idReporteNum)
+  );
+  const reporteSnap = await getDocs(reporteQuery);
+  if (reporteSnap.empty) {
+    return Swal.fire("Error", "Reporte no encontrado.", "error");
+  }
+  let reporteHtml;
+  reporteSnap.forEach((docSnap) => {
+    const data = docSnap.data();
+    reporteHtml = data.report;
+  });
+  
+  // Creamos un contenedor temporal para capturar el reporte con margen
+  const container = document.createElement("div");
+  container.style.width = "900px";
+  container.style.margin = "20px auto";
+  container.style.padding = "20px";
+  container.innerHTML = `<link rel="stylesheet" href="styles.css">` + reporteHtml;
+  document.body.appendChild(container);
+
+  // Usamos html2canvas para capturar el contenedor y generar el PDF
+  html2canvas(container, { scale: 2 }).then((canvas) => {
+    const imgData = canvas.toDataURL("image/png");
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF("p", "mm", "a4");
+    const margin = 10; // margen de 10mm
+    const pdfWidth = pdf.internal.pageSize.getWidth() - margin * 2;
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    pdf.addImage(imgData, "PNG", margin, margin, pdfWidth, pdfHeight);
+    pdf.save(`ReporteCierre_${idReporteNum}.pdf`);
+    document.body.removeChild(container);
+  });
+}
