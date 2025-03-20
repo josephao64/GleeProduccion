@@ -65,6 +65,54 @@ function formatDate(date) {
 }
 
 /*******************************************************
+ * Función parseDate
+ * Se encarga de interpretar una fecha en formato ISO o dd/mm/yyyy
+ *******************************************************/
+function parseDate(dateString) {
+  // Intenta parsear como fecha ISO
+  const iso = Date.parse(dateString);
+  if (!isNaN(iso)) {
+    return new Date(dateString);
+  }
+  // Si no es ISO, asume dd/mm/yyyy
+  const parts = dateString.split("/");
+  if (parts.length === 3) {
+    const day = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const year = parseInt(parts[2], 10);
+    return new Date(year, month, day);
+  }
+  return new Date();
+}
+
+/*******************************************************
+ * Función para descargar el comprobante en PDF
+ * utilizando jsPDF
+ *******************************************************/
+function descargarComprobante(venta) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  doc.setFontSize(16);
+  doc.text("Comprobante de Venta", 10, 20);
+  doc.setFontSize(12);
+  const fecha = new Date(venta.fecha);
+  doc.text("Fecha: " + fecha.toLocaleString(), 10, 30);
+  doc.text("ID Venta: " + venta.idVenta, 10, 40);
+  doc.text("Cliente: " + (venta.cliente.nombre || "N/A"), 10, 50);
+  let posY = 60;
+  venta.productos.forEach((item, idx) => {
+    doc.text(
+      `${idx + 1}. ${item.producto_nombre} x${item.cantidad} - Q${item.subtotal.toFixed(2)}`,
+      10,
+      posY
+    );
+    posY += 10;
+  });
+  doc.text("Total: Q" + venta.total.toFixed(2), 10, posY + 10);
+  doc.save("comprobante.pdf");
+}
+
+/*******************************************************
  * Obtener el próximo número de apertura de forma incremental
  *******************************************************/
 async function getNextAperturaId() {
@@ -574,7 +622,7 @@ async function procesarVenta() {
   batch.set(ventaRef, venta);
   try {
     await batch.commit();
-    // Mostrar el reporte de cierre en un modal propio (sin redirigir)
+    // Mostrar el comprobante generado en un modal y permitir la descarga
     Swal.fire({
       title: "Venta procesada!",
       html: `
@@ -744,10 +792,9 @@ async function cerrarCaja() {
  *******************************************************/
 function generarReporteCierreHTML(ventas, cierre) {
   // Calcular diferencia: Diferencia = Arqueo - Total efectivo (donde Total efectivo = montoApertura + totalEfectivo)
-  // Aquí calculamos la diferencia según la fórmula indicada.
   const diff = Number(cierre.totalIngresado || 0) - Number(cierre.totalEfectivoSistema || 0);
   const colorDiferencia = diff >= 0 ? "green" : "red";
-  // Se formatea la fecha de cierre usando las funciones de parse y format (se asume que cierre.fechaCierre está en ISO o formato dd/mm/yyyy)
+  // Se formatea la fecha de cierre usando parseDate y formatDate
   const fechaFormateada = cierre.fechaCierre ? formatDate(parseDate(cierre.fechaCierre)) : "Fecha no disponible";
 
   // Resumen de ventas por método
@@ -759,13 +806,12 @@ function generarReporteCierreHTML(ventas, cierre) {
   
   // Total efectivo se calcula como: montoApertura + totalEfectivo
   const totalEfectivoSistema = Number(cierre.totalEfectivoSistema || 0);
-  // Además, se mostrará junto al arqueo (totalIngresado) y la suma de ambos
   const arqueo = Number(cierre.totalIngresado || 0);
   const sumaTotalEfectivo = totalEfectivoSistema + arqueo;
 
   return `
     <div class="container" style="max-width: 900px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 0 10px rgba(0,0,0,0.1); font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-      <!-- Encabezado en una sola línea -->
+      <!-- Encabezado -->
       <div style="display: flex; justify-content: space-between; margin-bottom: 20px;">
         <div style="text-align: left;">
           <div><strong>ID Cierre:</strong> <span style="font-size: 1.2em;">${cierre.idCierre}</span></div>
@@ -813,13 +859,10 @@ function generarReporteCierreHTML(ventas, cierre) {
         </thead>
         <tbody>
           <tr>
-            <!-- Aquí se muestra el Total efectivo (montoApertura + totalEfectivo) y se le suma el Arqueo, visualizado como operación -->
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">
               Q ${Number(totalEfectivoSistema).toFixed(2)} + Q ${Number(arqueo).toFixed(2)} = Q ${Number(sumaTotalEfectivo).toFixed(2)}
             </td>
-            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">
-              Q ${Number(arqueo).toFixed(2)}
-            </td>
+            <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">Q ${Number(arqueo).toFixed(2)}</td>
             <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">
               <span style="color: ${colorDiferencia};">
                 ${diff >= 0 ? diff.toFixed(2) : "-" + Math.abs(diff).toFixed(2)}
@@ -897,15 +940,10 @@ window.procesarVenta = procesarVenta;
 window.cerrarCaja = cerrarCaja;
 window.descargarComprobante = descargarComprobante;
 
-initSistemaVenta();
-
-
 /*******************************************************
- * Exponer funciones globalmente
+ * Función para descargar el reporte PDF usando html2canvas
  *******************************************************/
 window.descargarReportePDF = descargarReportePDF;
-
-// Función para descargar el reporte PDF usando html2canvas
 async function descargarReportePDF(idReporteCierre) {
   const idReporteNum = Number(idReporteCierre);
   const reporteQuery = query(
@@ -943,3 +981,5 @@ async function descargarReportePDF(idReporteCierre) {
     document.body.removeChild(container);
   });
 }
+
+initSistemaVenta();
